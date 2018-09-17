@@ -6,3 +6,4 @@ authors = ["Sergey Grankin <sgrankin@gmail.com>"]
 [dependencies]
 cgmath = "0.16.1"
 image = "0.19.0"
+collision = "0.18.0"
