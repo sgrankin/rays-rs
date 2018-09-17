@@ -1,0 +1,8 @@
+[package]
+name = "rays-rs"
+version = "0.1.0"
+authors = ["Sergey Grankin <sgrankin@gmail.com>"]
+
+[dependencies]
+cgmath = "0.16.1"
+image = "0.19.0"
