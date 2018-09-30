@@ -15,12 +15,19 @@ fn main() -> Result<(), Box<Error>> {
     let vertical = Vector3::new(0.0, 2.0, 0.0);
     let horizontal = Vector3::new(4.0, 0.0, 0.0);
 
+    let world = vec![
+        Sphere { center: Point3::new(0f64, 0f64, -1f64), radius: 0.5f64 },
+        Sphere { center: Point3::new(0f64, -100.5f64, -1f64), radius: 100f64 },
+    ];
+
     let mut imgbuf = image::RgbImage::new(width, height);
     for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
         let u = f64::from(x) / f64::from(width);
         let v = (f64::from(height - y) as f64) / f64::from(height);
         let r = Ray::new(origin, (lower_left_corner + u * horizontal + v * vertical).normalize());
-        let col = color(&r);
+        // TODO can't actually pass anything here—the algo doesn't support vectors, the vector impl doesn't return normals... and the entire lib is too complicated.
+        // just start writing a collision helper! CGmath may be ok
+        let col = color(&r, &world[0]);
         *pixel =
             image::Rgb([(col[0] * 255.99) as u8, (col[1] * 255.99) as u8, (col[2] * 255.99) as u8]);
     }
@@ -29,11 +36,16 @@ fn main() -> Result<(), Box<Error>> {
     Ok(())
 }
 
-fn color(r: &Ray3<f64>) -> Vector3<f64> {
-    let s = Sphere { center: Point3::new(0f64, 0f64, -1f64), radius: 0.5f64 };
-    if s.intersection(r).is_some() {
-        return Vector3::new(1f64, 0f64, 0f64);
+fn color(r: &Ray3<f64>, s: &Sphere<f64>) -> Vector3<f64> {
+    match s.intersection(r) {
+        Some(p) => {
+            let v = p - s.center;
+            Vector3::new(v.x + 1f64, v.y + 1f64, v.z + 1f64) * 0.5
+        }
+
+        None => {
+            let t = (r.direction.y + 1.0) * 0.5;
+            (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) + t * Vector3::new(0.5, 0.7, 1.0)
+        }
     }
-    let t = (r.direction.y + 1.0) * 0.5;
-    (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) + t * Vector3::new(0.5, 0.7, 1.0)
 }
