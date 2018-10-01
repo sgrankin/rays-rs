@@ -11,9 +11,9 @@ mod shapes;
 use self::shapes::*;
 
 fn main() -> Result<(), Box<Error>> {
-    let width = 1440;
-    let height = 900;
-    let samples = 8;
+    let width = 640;
+    let height = 400;
+    let samples = 16;
 
     let world = vec![
         Sphere { center: Point3::new(0f64, 0f64, -1f64), radius: 0.5f64 },
@@ -26,15 +26,17 @@ fn main() -> Result<(), Box<Error>> {
         .enumerate_pixels_mut()
         .collect::<Vec<(u32, u32, &mut image::Rgb<u8>)>>()
         .par_iter_mut()
+        // .iter_mut()
         .for_each(|(x, y, pixel)| {
             let mut col = Vector3::zero();
             for _ in 0..samples {
                 let u = (f64::from(*x) + random::<f64>()) / f64::from(width);
                 let v = (f64::from(height - *y) + random::<f64>()) / f64::from(height);
                 let r = c.get_ray(u, v);
-                col += color(&r, &world);
+                col += color(&r, &world, 0);
             }
             col /= f64::from(samples);
+            col = col.map(|x| x.sqrt());
             **pixel = image::Rgb([
                 (col[0] * 255.99) as u8,
                 (col[1] * 255.99) as u8,
@@ -46,15 +48,24 @@ fn main() -> Result<(), Box<Error>> {
     Ok(())
 }
 
-fn color<S, T>(r: &Ray3<S>, s: &[T]) -> Vector3<S>
+fn color<S, T>(r: &Ray3<S>, world: &[T], bounce: u64) -> Vector3<S>
 where
     S: BaseFloat,
+    Standard: Distribution<S>,
     T: Intersectable<S>,
 {
-    match s.intersection(r) {
-        Some(p) => p.normal.map(|x| x + S::one()) / S::from(2).unwrap(),
+    match world.intersection(r) {
+        Some(hit) if bounce < 100
+        // && (r.origin - hit.point).magnitude() > S::from(0.00001).unwrap()
+        =>
+        // hit.normal.map(|x| x + S::one()) / S::from(2).unwrap(),
+        {
+            let direction = (hit.normal + random_in_unit_sphere::<S>()).normalize();
+            color(&Ray3 { origin: hit.point, direction: direction }, world, bounce + 1)
+                .map(|x| x * S::from(0.5).unwrap())
+        }
 
-        None => {
+        _ => {
             let t = (r.direction.y + S::one()) / S::from(2).unwrap();
             Vector3::new(S::one(), S::one(), S::one()) * (S::one() - t)
                 + Vector3::new(S::from(0.5).unwrap(), S::from(0.7).unwrap(), S::one()) * t
@@ -92,6 +103,21 @@ where
                     self.image_bounds.y * (v - S::from(0.5).unwrap()),
                     S::zero(),
                 )).normalize(),
+        }
+    }
+}
+use rand::distributions::Distribution;
+use rand::distributions::Standard;
+fn random_in_unit_sphere<S>() -> Vector3<S>
+where
+    S: BaseFloat,
+    Standard: Distribution<S>,
+{
+    loop {
+        let p = Vector3::new(random::<S>(), random::<S>(), random::<S>()) * S::from(2).unwrap()
+            - Vector3::from_value(S::one());
+        if p.magnitude2() < S::one() {
+            return p;
         }
     }
 }
