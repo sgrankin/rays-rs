@@ -1,4 +1,5 @@
 use cgmath::*;
+use crate::material::*;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -18,6 +19,7 @@ where
     pub origin: P,
     pub direction: V,
 }
+// todo ray::new
 
 pub type Ray3<S> = Ray<S, Point3<S>, Vector3<S>>;
 

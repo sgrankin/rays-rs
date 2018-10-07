@@ -2,23 +2,236 @@ extern crate cgmath;
 extern crate image;
 
 use cgmath::*;
-use rand::random;
+use rand::*;
 use rayon::prelude::*;
 use std::error::Error;
 use std::ops::*;
 
-mod shapes;
-use self::shapes::*;
+mod util;
+use self::util::*;
+
+mod geom {
+    use cgmath::*;
+
+    #[derive(Copy, Clone, PartialEq, Debug)]
+    pub struct Ray<S, P, V>
+    where
+        S: BaseNum,
+        V: VectorSpace<Scalar = S>,
+        P: EuclideanSpace<Scalar = S, Diff = V>,
+    {
+        pub origin: P,
+        pub direction: V,
+    }
+    pub type Ray3<S> = Ray<S, Point3<S>, Vector3<S>>;
+
+    pub trait Shape<S: BaseFloat> {
+        fn intersect(&self, _: &Ray3<S>) -> Option<(Point3<S>, Vector3<S>)>;
+    }
+
+    pub struct Sphere<S: BaseFloat> {
+        pub center: Point3<S>,
+        pub radius: S,
+    }
+
+    impl<S: BaseFloat> Shape<S> for Sphere<S> {
+        fn intersect(&self, r: &Ray3<S>) -> Option<(Point3<S>, Vector3<S>)> {
+            // TODO credit collision crate for the source of the formula; rewrite for readability: this can be explained via geometry, but needs better names and a block comment.
+            let s = self;
+            let l = s.center - r.origin;
+            let tca = l.dot(r.direction);
+            if tca < S::zero() {
+                return None;
+            }
+            let d2 = l.dot(l) - tca * tca;
+            if d2 > s.radius * s.radius {
+                return None;
+            }
+            let thc = (s.radius * s.radius - d2).sqrt();
+            let p = r.origin + r.direction * (tca - thc);
+            Some((p, (p - s.center).normalize()))
+        }
+    }
+}
+
+mod material {
+    use super::geom::*;
+    use super::util;
+    use cgmath::*;
+    use rand;
+
+    type PixelXform<S /*: BaseFloat*/> = Box<Fn(Vector3<S>) -> Vector3<S>>;
+
+    pub trait Material<S: BaseFloat> {
+        fn scatter(
+            &self,
+            in_: &Ray3<S>,
+            point: &Point3<S>,
+            normal: &Vector3<S>,
+        ) -> Option<(Ray3<S>, PixelXform<S>)>;
+    }
+
+    #[derive(Copy, Clone, PartialEq)]
+    pub struct Lambertian<S: BaseFloat> {
+        pub albedo: Vector3<S>,
+    }
+
+    fn attenuate<S: BaseFloat + 'static>(albedo: Vector3<S>) -> PixelXform<S> {
+        Box::new(move |pixel| {
+            Vector3::new(pixel.x * albedo.x, pixel.y * albedo.y, pixel.z * albedo.z)
+        })
+    }
+
+    impl<S: BaseFloat + 'static> Material<S> for Lambertian<S>
+    where
+        rand::distributions::Standard: rand::distributions::Distribution<S>,
+    {
+        fn scatter(
+            &self,
+            in_: &Ray3<S>,
+            point: &Point3<S>,
+            normal: &Vector3<S>,
+        ) -> Option<(Ray3<S>, PixelXform<S>)> {
+            // Note we could just as well only scatter with some probability p and have attenuation be albedo/p.
+
+            let ray = Ray3 {
+                origin: *point,
+                direction: (normal + util::random_in_unit_sphere()).normalize(),
+            };
+            Some((ray, attenuate(self.albedo)))
+        }
+    }
+
+    #[derive(Copy, Clone, PartialEq, Debug)]
+    pub struct Metal<S: BaseNum> {
+        pub albedo: Vector3<S>,
+        pub fuzz: S,
+    }
+
+    impl<S: BaseFloat> Metal<S> {
+        fn reflect(v: &Vector3<S>, norm: &Vector3<S>) -> Vector3<S> {
+            (v - norm * v.dot(*norm) * S::from(2).unwrap()).normalize()
+        }
+    }
+
+    impl<S: BaseFloat + 'static> Material<S> for Metal<S>
+    where
+        rand::distributions::Standard: rand::distributions::Distribution<S>,
+    {
+        fn scatter(
+            &self,
+            in_: &Ray3<S>,
+            point: &Point3<S>,
+            normal: &Vector3<S>,
+        ) -> Option<(Ray3<S>, PixelXform<S>)> {
+            let reflected = Self::reflect(&in_.direction, &normal);
+            let scattered = Ray3 {
+                origin: *point,
+                direction: (reflected + util::random_in_unit_sphere() * self.fuzz).normalize(),
+            };
+            if scattered.direction.dot(*normal) > S::zero() {
+                Some((scattered, attenuate(self.albedo)))
+            } else {
+                None
+            }
+        }
+    }
+
+}
+
+mod prims {
+    use super::geom::*;
+    use super::material::*;
+
+    use cgmath::*;
+    use std::marker::PhantomData;
+
+    pub trait Primitive<S: BaseFloat> {
+        fn intersect(&self, _: &Ray3<S>) -> Option<SurfaceInteraction<S>>;
+    }
+
+    pub struct SurfaceInteraction<'a, S: BaseFloat> {
+        pub prim: &'a Primitive<S>,
+        pub point: Point3<S>,
+        pub normal: Vector3<S>,
+        pub material: &'a Material<S>,
+    }
+
+    pub struct ShapePrimitive<S: BaseFloat, Sh: Shape<S>, M: Material<S>> {
+        pub shape: Sh,
+        pub material: M,
+        __: PhantomData<fn(_: ()) -> (S)>,
+    }
+    impl<S: BaseFloat, Sh: Shape<S>, M: Material<S>> ShapePrimitive<S, Sh, M> {
+        pub fn new(shape: Sh, material: M) -> ShapePrimitive<S, Sh, M> {
+            ShapePrimitive { shape, material, __: PhantomData }
+        }
+    }
+
+    impl<S: BaseFloat, Sh: Shape<S>, M: Material<S>> Primitive<S> for ShapePrimitive<S, Sh, M> {
+        fn intersect(&self, r: &Ray3<S>) -> Option<SurfaceInteraction<S>> {
+            self.shape.intersect(r).map(|(point, normal)| SurfaceInteraction {
+                point,
+                normal,
+                prim: self,
+                material: &self.material,
+            })
+        }
+    }
+}
+
+use self::geom::*;
+use self::material::*;
+use self::prims::*;
+
+struct Scene<S: BaseFloat> {
+    pub aggregate: Primitive<S>,
+}
+
+struct Aggregate<S: BaseFloat> {
+    prims: Vec<Box<Primitive<S> + Sync>>,
+}
+
+impl<S: BaseFloat> Primitive<S> for Aggregate<S> {
+    fn intersect(&self, r: &Ray3<S>) -> Option<SurfaceInteraction<S>> {
+        self.prims.iter().fold(None, |best, p| match (best, p.intersect(r)) {
+            (None, int) => int,
+            (Some(best), None) => Some(best),
+            (Some(best), Some(int)) => {
+                let t_int = (int.point - r.origin).magnitude();
+                let t_best = (best.point - r.origin).magnitude();
+                Some(if t_int < t_best { int } else { best })
+            }
+        })
+    }
+}
 
 fn main() -> Result<(), Box<Error>> {
-    let width = 640;
-    let height = 400;
-    let samples = 16;
+    let width = 320;
+    let height = 200;
+    let samples = 100;
+    let bounces = 50;
 
-    let world = vec![
-        Sphere { center: Point3::new(0f64, 0f64, -1f64), radius: 0.5f64 },
-        Sphere { center: Point3::new(0f64, -100.5f64, -1f64), radius: 100f64 },
-    ];
+    let world = Aggregate::<f64> {
+        prims: vec![
+            Box::new(ShapePrimitive::new(
+                Sphere { center: Point3::new(0.0, 0.0, -1.0), radius: 0.5f64 },
+                Lambertian { albedo: Vector3::new(0.8, 0.3, 0.3) },
+            )),
+            Box::new(ShapePrimitive::new(
+                Sphere { center: Point3::new(0.0, -100.5, -1.0), radius: 100.0 },
+                Lambertian { albedo: Vector3::new(0.8, 0.8, 0.0) },
+            )),
+            Box::new(ShapePrimitive::new(
+                Sphere { center: Point3::new(1.0, 0.0, -1.0), radius: 0.5 },
+                Metal { albedo: Vector3::new(0.8, 0.6, 0.2), fuzz: 1.0 },
+            )),
+            Box::new(ShapePrimitive::new(
+                Sphere { center: Point3::new(-1.0, 0.0, -1.0), radius: 0.5 },
+                Metal { albedo: Vector3::new(0.8, 0.8, 0.8), fuzz: 0.3 },
+            )),
+        ],
+    };
 
     let c = Camera::new();
     let mut imgbuf = image::RgbImage::new(width, height);
@@ -30,13 +243,13 @@ fn main() -> Result<(), Box<Error>> {
         .for_each(|(x, y, pixel)| {
             let mut col = Vector3::zero();
             for _ in 0..samples {
-                let u = (f64::from(*x) + random::<f64>()) / f64::from(width);
-                let v = (f64::from(height - *y) + random::<f64>()) / f64::from(height);
+                let u = (f64::from(*x) + random::<f64>() - 0.5) / f64::from(width);
+                let v = (f64::from(height - *y) + random::<f64>() - 0.5) / f64::from(height);
                 let r = c.get_ray(u, v);
-                col += color(&r, &world, 0);
+                col += color(&r, &world, bounces);
             }
             col /= f64::from(samples);
-            col = col.map(|x| x.sqrt());
+            col = col.map(|x| x.sqrt()); // gamma correction
             **pixel = image::Rgb([
                 (col[0] * 255.99) as u8,
                 (col[1] * 255.99) as u8,
@@ -48,24 +261,25 @@ fn main() -> Result<(), Box<Error>> {
     Ok(())
 }
 
-fn color<S, T>(r: &Ray3<S>, world: &[T], bounce: u64) -> Vector3<S>
+fn color<S: BaseFloat>(r: &Ray3<S>, world: &Primitive<S>, bounces: u64) -> Vector3<S>
 where
-    S: BaseFloat,
-    Standard: Distribution<S>,
-    T: Intersectable<S>,
+    distributions::Standard: distributions::Distribution<S>,
 {
-    match world.intersection(r) {
-        Some(hit) if bounce < 100
+    match world.intersect(r) {
+        Some(ref hit) if bounces > 0
         // && (r.origin - hit.point).magnitude() > S::from(0.00001).unwrap()
         =>
         // hit.normal.map(|x| x + S::one()) / S::from(2).unwrap(),
         {
-            let direction = (hit.normal + random_in_unit_sphere::<S>()).normalize();
-            color(&Ray3 { origin: hit.point, direction: direction }, world, bounce + 1)
-                .map(|x| x * S::from(0.5).unwrap())
+            // Hit a thing!
+            match hit.material.scatter(r, &hit.point, &hit.normal) {
+                None => Vector3::<S>::zero(),
+                Some((ray, xform)) => xform(color(&ray, world, bounces-1)),
+            }
         }
 
         _ => {
+            // No hit - eval against background radiation.
             let t = (r.direction.y + S::one()) / S::from(2).unwrap();
             Vector3::new(S::one(), S::one(), S::one()) * (S::one() - t)
                 + Vector3::new(S::from(0.5).unwrap(), S::from(0.7).unwrap(), S::one()) * t
@@ -103,21 +317,6 @@ where
                     self.image_bounds.y * (v - S::from(0.5).unwrap()),
                     S::zero(),
                 )).normalize(),
-        }
-    }
-}
-use rand::distributions::Distribution;
-use rand::distributions::Standard;
-fn random_in_unit_sphere<S>() -> Vector3<S>
-where
-    S: BaseFloat,
-    Standard: Distribution<S>,
-{
-    loop {
-        let p = Vector3::new(random::<S>(), random::<S>(), random::<S>()) * S::from(2).unwrap()
-            - Vector3::from_value(S::one());
-        if p.magnitude2() < S::one() {
-            return p;
         }
     }
 }
