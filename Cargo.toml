@@ -5,13 +5,16 @@ authors = ["Sergey Grankin <sgrankin@gmail.com>"]
 edition = '2018'
 
 [dependencies]
-cgmath = "*"
 image = "*"
 rand = "*"
 rayon = "*"
 num-traits = "*"
 simple_logger = "*"
 log = "*"
+
+[dependencies.cgmath]
+version = "*"
+features = ["swizzle"]
 
 [profile.release]
 debug = true
