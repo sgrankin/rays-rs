@@ -64,7 +64,7 @@ mod material {
     use cgmath::*;
     use rand;
 
-    type PixelXform<S /*: BaseFloat*/> = Box<Fn(Vector3<S>) -> Vector3<S>>;
+    type PixelXform<S /*: BaseFloat*/> = Box<dyn Fn(Vector3<S>) -> Vector3<S>>;
 
     pub trait Material<S: BaseFloat> {
         fn scatter(
@@ -92,7 +92,7 @@ mod material {
     {
         fn scatter(
             &self,
-            in_: &Ray3<S>,
+            _in_: &Ray3<S>,
             point: &Point3<S>,
             normal: &Vector3<S>,
         ) -> Option<(Ray3<S>, PixelXform<S>)> {
@@ -151,14 +151,14 @@ mod prims {
     use std::marker::PhantomData;
 
     pub trait Primitive<S: BaseFloat> {
-        fn intersect(&self, _: &Ray3<S>) -> Option<SurfaceInteraction<S>>;
+        fn intersect(&self, _: &Ray3<S>) -> Option<SurfaceInteraction<'_, S>>;
     }
 
     pub struct SurfaceInteraction<'a, S: BaseFloat + 'a> {
-        pub prim: &'a Primitive<S>,
+        pub prim: &'a dyn Primitive<S>,
         pub point: Point3<S>,
         pub normal: Vector3<S>,
-        pub material: &'a Material<S>,
+        pub material: &'a dyn Material<S>,
     }
 
     pub struct ShapePrimitive<S: BaseFloat, Sh: Shape<S>, M: Material<S>> {
@@ -173,7 +173,7 @@ mod prims {
     }
 
     impl<S: BaseFloat, Sh: Shape<S>, M: Material<S>> Primitive<S> for ShapePrimitive<S, Sh, M> {
-        fn intersect(&self, r: &Ray3<S>) -> Option<SurfaceInteraction<S>> {
+        fn intersect(&self, r: &Ray3<S>) -> Option<SurfaceInteraction<'_, S>> {
             self.shape.intersect(r).map(|(point, normal)| SurfaceInteraction {
                 point,
                 normal,
@@ -189,15 +189,15 @@ use self::material::*;
 use self::prims::*;
 
 struct Scene<S: BaseFloat> {
-    pub aggregate: Primitive<S>,
+    pub aggregate: dyn Primitive<S>,
 }
 
 struct Aggregate<S: BaseFloat> {
-    prims: Vec<Box<Primitive<S> + Sync>>,
+    prims: Vec<Box<dyn Primitive<S> + Sync>>,
 }
 
 impl<S: BaseFloat> Primitive<S> for Aggregate<S> {
-    fn intersect(&self, r: &Ray3<S>) -> Option<SurfaceInteraction<S>> {
+    fn intersect(&self, r: &Ray3<S>) -> Option<SurfaceInteraction<'_, S>> {
         // TODO: rewrite this faster. for loop & two if statements
         self.prims.iter().fold(None, |best, p| match (best, p.intersect(r)) {
             (None, int) => int,
@@ -211,7 +211,7 @@ impl<S: BaseFloat> Primitive<S> for Aggregate<S> {
     }
 }
 
-fn main() -> Result<(), Box<Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     simple_logger::init()?;
     info!("starting");
     let width = 960;
@@ -269,7 +269,7 @@ fn main() -> Result<(), Box<Error>> {
     Ok(())
 }
 
-fn color<S: BaseFloat>(r: &Ray3<S>, world: &Primitive<S>, bounces: u64) -> Vector3<S>
+fn color<S: BaseFloat>(r: &Ray3<S>, world: &dyn Primitive<S>, bounces: u64) -> Vector3<S>
 where
     distributions::Standard: distributions::Distribution<S>,
 {
