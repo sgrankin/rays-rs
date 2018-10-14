@@ -7,7 +7,11 @@ edition = '2018'
 [dependencies]
 cgmath = "*"
 image = "*"
-collision = "*"
 rand = "*"
 rayon = "*"
-num-traits = "0.2.6"
+num-traits = "*"
+simple_logger = "*"
+log = "*"
+
+[profile.release]
+debug = true
