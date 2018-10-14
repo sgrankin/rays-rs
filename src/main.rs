@@ -300,40 +300,82 @@ fn main() -> Result<(), Box<dyn Error>> {
     let samples = 100; // 100;
     let bounces = 50; // 50;
 
-    let world = Aggregate::<f64> {
-        prims: vec![
-            Box::new(ShapePrimitive::new(
-                Sphere { center: Point3::new(0.0, 0.0, -1.0), radius: 0.5 },
-                Lambertian { albedo: Vector3::new(0.1, 0.2, 0.5) },
-            )),
-            Box::new(ShapePrimitive::new(
-                Sphere { center: Point3::new(0.0, -100.5, -1.0), radius: 100.0 },
-                Lambertian { albedo: Vector3::new(0.6, 0.2, 0.6) },
-            )),
-            Box::new(ShapePrimitive::new(
-                Sphere { center: Point3::new(1.0, 0.0, -1.0), radius: 0.5 },
-                Metal { albedo: Vector3::new(0.8, 0.6, 0.2), fuzz: 0.1 },
-            )),
-            Box::new(ShapePrimitive::new(
-                Sphere { center: Point3::new(-1.0, 0.0, -1.0), radius: 0.5 },
-                Dielectric { ref_index: 1.5 },
-            )),
-            Box::new(ShapePrimitive::new(
-                Sphere { center: Point3::new(-1.0, 0.0, -1.0), radius: -0.45 },
-                Dielectric { ref_index: 1.5 },
-            )),
-        ],
-    };
+    let mut prims: Vec<Box<dyn Primitive<f64> + Sync>> = vec![
+        Box::new(ShapePrimitive::new(
+            Sphere { center: Point3::new(0.0, -1000.0, 0.0), radius: 1000.0 },
+            Lambertian { albedo: Vector3::new(0.5, 0.5, 0.5) },
+        )),
+        Box::new(ShapePrimitive::new(
+            Sphere { center: Point3::new(0.0, 1.0, 0.0), radius: 1.0 },
+            Dielectric { ref_index: 1.5 },
+        )),
+        Box::new(ShapePrimitive::new(
+            Sphere { center: Point3::new(-4.0, 1.0, 0.0), radius: 1.0 },
+            Lambertian { albedo: Vector3::new(0.4, 0.2, 0.1) },
+        )),
+        Box::new(ShapePrimitive::new(
+            Sphere { center: Point3::new(4.0, 1.0, 0.0), radius: 1.0 },
+            Metal { albedo: Vector3::new(0.7, 0.6, 0.5), fuzz: 0.0 },
+        )),
+    ];
+    for a in -11..11 {
+        for b in -11..11 {
+            let center = Point3::new(
+                f64::from(a) + 0.9 * random::<f64>(),
+                0.2,
+                f64::from(b) + 0.9 * random::<f64>(),
+            );
+            if (center - Point3::new(4.0, 0.0, 2.0)).magnitude() <= 0.9 {
+                continue;
+            }
+            let mat = random::<f64>();
+            let prim = if mat < 0.8 {
+                // diffuse
+                Box::new(ShapePrimitive::new(
+                    Sphere { center, radius: 0.2 },
+                    Lambertian {
+                        albedo: Vector3::new(
+                            random::<f64>() * random::<f64>(),
+                            random::<f64>() * random::<f64>(),
+                            random::<f64>() * random::<f64>(),
+                        ),
+                    },
+                )) as Box<dyn Primitive<f64> + Sync>
+            } else if mat < 0.95 {
+                //metal
+                Box::new(ShapePrimitive::new(
+                    Sphere { center, radius: 0.2 },
+                    Metal {
+                        albedo: Vector3::new(
+                            (random::<f64>() + 1.0) / 2.0,
+                            (random::<f64>() + 1.0) / 2.0,
+                            (random::<f64>() + 1.0) / 2.0,
+                        ),
+                        fuzz: 0.5 * random::<f64>(),
+                    },
+                )) as Box<dyn Primitive<f64> + Sync>
+            } else {
+                // glass
+                Box::new(ShapePrimitive::new(
+                    Sphere { center, radius: 0.2 },
+                    Dielectric { ref_index: 1.5 },
+                )) as Box<dyn Primitive<f64> + Sync>
+            };
+            prims.push(prim)
+        }
+    }
 
-    let from = Point3::new(-2.0, 2.0, 1.0);
+    let world = Aggregate::<f64> { prims };
+
+    let from = Point3::new(8.0, 3.0, 2.0);
     let to = Point3::new(0.0, 0.0, -1.0);
     let c = Camera::new(
         from,
         to,
         Vector3::unit_y(),
-        65.0,
+        45.0,
         f64::from(width) / f64::from(height),
-        0.2,
+        0.1,
         (to - from).magnitude(),
     );
     let mut imgbuf = image::RgbImage::new(width, height);
