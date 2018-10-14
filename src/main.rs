@@ -308,7 +308,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             )),
             Box::new(ShapePrimitive::new(
                 Sphere { center: Point3::new(0.0, -100.5, -1.0), radius: 100.0 },
-                Lambertian { albedo: Vector3::new(0.8, 0.8, 0.0) },
+                Lambertian { albedo: Vector3::new(0.6, 0.2, 0.6) },
             )),
             Box::new(ShapePrimitive::new(
                 Sphere { center: Point3::new(1.0, 0.0, -1.0), radius: 0.5 },
@@ -325,7 +325,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         ],
     };
 
-    let c = Camera::new();
+    let c = Camera::new(
+        Point3::new(-2.0, 2.0, 1.0),
+        Point3::new(0.0, 0.0, -1.0),
+        Vector3::unit_y(),
+        45.0,
+        f64::from(width) / f64::from(height),
+    );
     let mut imgbuf = image::RgbImage::new(width, height);
     imgbuf
         .enumerate_pixels_mut()
@@ -382,34 +388,39 @@ where
 
 struct Camera<S> {
     origin: Point3<S>,
-    direction: Vector3<S>,
-    image_distance: S,
-    image_bounds: Vector2<S>,
+    lower_left: Point3<S>,
+    horizontal: Vector3<S>,
+    vertical: Vector3<S>,
 }
 impl<S> Camera<S>
 where
     S: BaseFloat,
 {
-    fn new() -> Camera<S> {
+    fn new(origin: Point3<S>, target: Point3<S>, vup: Vector3<S>, fov: S, aspect: S) -> Camera<S> {
+        let theta = fov * S::from(std::f64::consts::PI / 180.0).unwrap();
+
+        // Image plane is at -1w:
+        let half_width = (theta / S::from(2).unwrap()).tan();
+        let half_height = half_width / aspect;
+
+        let w = (origin - target).normalize();
+        let u = vup.cross(w).normalize();
+        let v = w.cross(u);
+
         Camera {
-            origin: Point3::origin(),
-            direction: Vector3::unit_z().neg(),
-            image_distance: S::one(),
-            image_bounds: Vector2::new(S::from(3.2).unwrap(), S::from(2.0).unwrap()),
+            origin,
+            lower_left: origin - u * half_width - v * half_height - w,
+            horizontal: u * (half_width + half_width),
+            vertical: v * (half_height + half_height),
         }
     }
-    fn get_ray(&self, u: S, v: S) -> Ray3<S> {
+    fn get_ray(&self, s: S, t: S) -> Ray3<S> {
         // TODO: The math for the direction *depends* on direction only having a z component.
         // Figure out how to transform the screen bounds correctly into the direction's coordinate system.
         Ray3 {
             origin: self.origin,
-            direction: (self.direction * self.image_distance
-                + self.origin.to_vec()
-                + Vector3::new(
-                    self.image_bounds.x * (u - S::from(0.5).unwrap()),
-                    self.image_bounds.y * (v - S::from(0.5).unwrap()),
-                    S::zero(),
-                )).normalize(),
+            direction: ((self.lower_left + self.horizontal * s + self.vertical * t) - self.origin)
+                .normalize(),
         }
     }
 }
