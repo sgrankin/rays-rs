@@ -1,14 +1,18 @@
-extern crate cgmath;
-extern crate image;
+use std::alloc::System;
+#[global_allocator]
+static GLOBAL: System = System;
+
+use log::*;
+use simple_logger;
 
 use cgmath::*;
+use image;
 use rand::*;
 use rayon::prelude::*;
 use std::error::Error;
 use std::ops::*;
 
 mod util;
-use self::util::*;
 
 mod geom {
     use cgmath::*;
@@ -150,7 +154,7 @@ mod prims {
         fn intersect(&self, _: &Ray3<S>) -> Option<SurfaceInteraction<S>>;
     }
 
-    pub struct SurfaceInteraction<'a, S: BaseFloat> {
+    pub struct SurfaceInteraction<'a, S: BaseFloat + 'a> {
         pub prim: &'a Primitive<S>,
         pub point: Point3<S>,
         pub normal: Vector3<S>,
@@ -194,6 +198,7 @@ struct Aggregate<S: BaseFloat> {
 
 impl<S: BaseFloat> Primitive<S> for Aggregate<S> {
     fn intersect(&self, r: &Ray3<S>) -> Option<SurfaceInteraction<S>> {
+        // TODO: rewrite this faster. for loop & two if statements
         self.prims.iter().fold(None, |best, p| match (best, p.intersect(r)) {
             (None, int) => int,
             (Some(best), None) => Some(best),
@@ -207,8 +212,10 @@ impl<S: BaseFloat> Primitive<S> for Aggregate<S> {
 }
 
 fn main() -> Result<(), Box<Error>> {
-    let width = 320;
-    let height = 200;
+    simple_logger::init()?;
+    info!("starting");
+    let width = 960;
+    let height = 600;
     let samples = 100;
     let bounces = 50;
 
@@ -258,6 +265,7 @@ fn main() -> Result<(), Box<Error>> {
         });
 
     image::ImageRgb8(imgbuf).save("out.png")?;
+    info!("done");
     Ok(())
 }
 
