@@ -325,12 +325,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         ],
     };
 
+    let from = Point3::new(-2.0, 2.0, 1.0);
+    let to = Point3::new(0.0, 0.0, -1.0);
     let c = Camera::new(
-        Point3::new(-2.0, 2.0, 1.0),
-        Point3::new(0.0, 0.0, -1.0),
+        from,
+        to,
         Vector3::unit_y(),
-        45.0,
+        65.0,
         f64::from(width) / f64::from(height),
+        0.2,
+        (to - from).magnitude(),
     );
     let mut imgbuf = image::RgbImage::new(width, height);
     imgbuf
@@ -391,15 +395,27 @@ struct Camera<S> {
     lower_left: Point3<S>,
     horizontal: Vector3<S>,
     vertical: Vector3<S>,
+    lens_radius: S,
+    u: Vector3<S>,
+    v: Vector3<S>,
+    w: Vector3<S>,
 }
 impl<S> Camera<S>
 where
     S: BaseFloat,
+    rand::distributions::Standard: rand::distributions::Distribution<S>,
 {
-    fn new(origin: Point3<S>, target: Point3<S>, vup: Vector3<S>, fov: S, aspect: S) -> Camera<S> {
+    fn new(
+        origin: Point3<S>,
+        target: Point3<S>,
+        vup: Vector3<S>,
+        fov: S,
+        aspect: S,
+        aperture: S,
+        focus_dist: S,
+    ) -> Camera<S> {
         let theta = fov * S::from(std::f64::consts::PI / 180.0).unwrap();
 
-        // Image plane is at -1w:
         let half_width = (theta / S::from(2).unwrap()).tan();
         let half_height = half_width / aspect;
 
@@ -409,17 +425,23 @@ where
 
         Camera {
             origin,
-            lower_left: origin - u * half_width - v * half_height - w,
-            horizontal: u * (half_width + half_width),
-            vertical: v * (half_height + half_height),
+            lower_left: origin - (u * half_width + v * half_height + w) * focus_dist,
+            horizontal: u * (half_width + half_width) * focus_dist,
+            vertical: v * (half_height + half_height) * focus_dist,
+            lens_radius: aperture / S::from(2).unwrap(),
+            u,
+            v,
+            w,
         }
     }
     fn get_ray(&self, s: S, t: S) -> Ray3<S> {
-        // TODO: The math for the direction *depends* on direction only having a z component.
-        // Figure out how to transform the screen bounds correctly into the direction's coordinate system.
+        let rd = util::random_in_unit_disk() * self.lens_radius;
+        let offset = self.u * rd.x + self.v * rd.y;
+
         Ray3 {
-            origin: self.origin,
-            direction: ((self.lower_left + self.horizontal * s + self.vertical * t) - self.origin)
+            origin: self.origin + offset,
+            direction: ((self.lower_left + self.horizontal * s + self.vertical * t)
+                - (self.origin + offset))
                 .normalize(),
         }
     }

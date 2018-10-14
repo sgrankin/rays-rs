@@ -13,3 +13,16 @@ where
         }
     }
 }
+
+pub fn random_in_unit_disk<S: BaseFloat>() -> Vector2<S>
+where
+    distributions::Standard: distributions::Distribution<S>,
+{
+    loop {
+        let p = Vector2::new(random::<S>(), random::<S>()) * S::from(2).unwrap()
+            - Vector2::new(S::one(), S::one());
+        if p.magnitude2() < S::one() {
+            return p;
+        }
+    }
+}
