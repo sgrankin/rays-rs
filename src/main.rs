@@ -285,7 +285,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("starting");
     let width = 1920; // 960; //960;
     let height = 1200; // 600; // 600;
-    let sample_sqrt = 16;
+    let samples_per_pixel = 4;
 
     let mut prims: Vec<Box<dyn Primitive<f64> + Sync>> = vec![
         Box::new(ShapePrimitive::new(
@@ -373,19 +373,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         // .iter_mut()
         .for_each(|(x, y, pixel)| {
             let mut col = Vector3::zero();
-            for i in 0..(sample_sqrt * sample_sqrt) {
-                let quad_size = 1.0 / f64::from(sample_sqrt);
-                let x_quad = i % sample_sqrt;
-                let y_quad = i / sample_sqrt;
-                let u = (f64::from(*x) + quad_size * (f64::from(x_quad) + random::<f64>()))
-                    / f64::from(width);
-                let v = (f64::from(height - *y)
-                    + quad_size * (f64::from(y_quad) + random::<f64>()))
-                    / f64::from(height);
+            for _ in 0..samples_per_pixel {
+                let u = (f64::from(*x) + (random::<f64>())) / f64::from(width);
+                let v = (f64::from(height - *y) + (random::<f64>())) / f64::from(height);
                 let r = c.get_ray(u, v);
                 col += color(r, &world);
             }
-            col /= f64::from(sample_sqrt * sample_sqrt);
+            col /= f64::from(samples_per_pixel);
             col = col.map(|x| x.sqrt()); // gamma correction
             **pixel = image::Rgb([
                 (col[0] * 255.99) as u8,
