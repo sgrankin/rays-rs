@@ -1,7 +1,3 @@
-use std::alloc::System;
-#[global_allocator]
-static GLOBAL: System = System;
-
 use log::*;
 use simple_logger;
 
@@ -94,26 +90,18 @@ mod material {
     use rand;
     use std::ops::*;
 
-    type PixelXform<S /*: BaseFloat*/> = Box<dyn Fn(Vector3<S>) -> Vector3<S>>;
-
     pub trait Material<S: BaseFloat> {
         fn scatter(
             &self,
             in_: Ray3<S>,
             point: Point3<S>,
             normal: Vector3<S>,
-        ) -> Option<(Ray3<S>, PixelXform<S>)>;
+        ) -> Option<(Ray3<S>, Vector3<S>)>;
     }
 
     #[derive(Copy, Clone, PartialEq)]
     pub struct Lambertian<S: BaseFloat> {
         pub albedo: Vector3<S>,
-    }
-
-    fn attenuate<S: BaseFloat + 'static>(albedo: Vector3<S>) -> PixelXform<S> {
-        Box::new(move |pixel| {
-            Vector3::new(pixel.x * albedo.x, pixel.y * albedo.y, pixel.z * albedo.z)
-        })
     }
 
     impl<S: BaseFloat + 'static> Material<S> for Lambertian<S>
@@ -125,13 +113,13 @@ mod material {
             _in_: Ray3<S>,
             point: Point3<S>,
             normal: Vector3<S>,
-        ) -> Option<(Ray3<S>, PixelXform<S>)> {
+        ) -> Option<(Ray3<S>, Vector3<S>)> {
             // Note we could just as well only scatter with some probability p and have attenuation be albedo/p.
             let ray = Ray3 {
                 origin: point,
                 direction: (normal + util::random_in_unit_sphere()).normalize(),
             };
-            Some((ray, attenuate(self.albedo)))
+            Some((ray, self.albedo))
         }
     }
 
@@ -154,14 +142,14 @@ mod material {
             in_: Ray3<S>,
             point: Point3<S>,
             normal: Vector3<S>,
-        ) -> Option<(Ray3<S>, PixelXform<S>)> {
+        ) -> Option<(Ray3<S>, Vector3<S>)> {
             let reflected = reflect(in_.direction, normal);
             let scattered = Ray3 {
                 origin: point,
                 direction: (reflected + util::random_in_unit_sphere() * self.fuzz).normalize(),
             };
             if scattered.direction.dot(normal) > S::zero() {
-                Some((scattered, attenuate(self.albedo)))
+                Some((scattered, self.albedo))
             } else {
                 None
             }
@@ -198,7 +186,7 @@ mod material {
             in_: Ray3<S>,
             point: Point3<S>,
             normal: Vector3<S>,
-        ) -> Option<(Ray3<S>, PixelXform<S>)> {
+        ) -> Option<(Ray3<S>, Vector3<S>)> {
             let reflected = reflect(in_.direction, normal);
             let (outward_normal, ni_over_nt, cosine) = if in_.direction.dot(normal) > S::zero() {
                 (
@@ -213,7 +201,7 @@ mod material {
                     -in_.direction.dot(normal) / in_.direction.magnitude(),
                 )
             };
-            let attenuation = attenuate(Vector3::from_value(S::one()));
+            let attenuation = Vector3::from_value(S::one());
             let reflect_p = shlick(cosine, self.ref_index);
             let out = match refract(in_.direction, outward_normal, ni_over_nt) {
                 Some(refracted) if rand::random() >= reflect_p => refracted,
@@ -295,10 +283,9 @@ impl<S: BaseFloat> Primitive<S> for Aggregate<S> {
 fn main() -> Result<(), Box<dyn Error>> {
     simple_logger::init()?;
     info!("starting");
-    let width = 960; //960;
-    let height = 600; // 600;
-    let samples = 100; // 100;
-    let bounces = 50; // 50;
+    let width = 1920; // 960; //960;
+    let height = 1200; // 600; // 600;
+    let sample_sqrt = 16;
 
     let mut prims: Vec<Box<dyn Primitive<f64> + Sync>> = vec![
         Box::new(ShapePrimitive::new(
@@ -367,13 +354,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let world = Aggregate::<f64> { prims };
 
-    let from = Point3::new(8.0, 3.0, 2.0);
+    let from = Point3::new(12.0, 3.0, 3.0);
     let to = Point3::new(0.0, 0.0, -1.0);
     let c = Camera::new(
         from,
         to,
         Vector3::unit_y(),
-        45.0,
+        55.0,
         f64::from(width) / f64::from(height),
         0.1,
         (to - from).magnitude(),
@@ -386,13 +373,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         // .iter_mut()
         .for_each(|(x, y, pixel)| {
             let mut col = Vector3::zero();
-            for _ in 0..samples {
-                let u = (f64::from(*x) + random::<f64>() - 0.5) / f64::from(width);
-                let v = (f64::from(height - *y) + random::<f64>() - 0.5) / f64::from(height);
+            for i in 0..(sample_sqrt * sample_sqrt) {
+                let quad_size = 1.0 / f64::from(sample_sqrt);
+                let x_quad = i % sample_sqrt;
+                let y_quad = i / sample_sqrt;
+                let u = (f64::from(*x) + quad_size * (f64::from(x_quad) + random::<f64>()))
+                    / f64::from(width);
+                let v = (f64::from(height - *y)
+                    + quad_size * (f64::from(y_quad) + random::<f64>()))
+                    / f64::from(height);
                 let r = c.get_ray(u, v);
-                col += color(r, &world, bounces);
+                col += color(r, &world);
             }
-            col /= f64::from(samples);
+            col /= f64::from(sample_sqrt * sample_sqrt);
             col = col.map(|x| x.sqrt()); // gamma correction
             **pixel = image::Rgb([
                 (col[0] * 255.99) as u8,
@@ -406,30 +399,46 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn color<S: BaseFloat>(r: Ray3<S>, world: &dyn Primitive<S>, bounces: u64) -> Vector3<S>
+fn color<S: BaseFloat>(r: Ray3<S>, world: &dyn Primitive<S>) -> Vector3<S>
 where
     distributions::Standard: distributions::Distribution<S>,
 {
-    match world.intersect(r) {
-        Some(ref hit) if bounces > 0
-        // && (r.origin - hit.point).magnitude() > S::from(0.00001).unwrap()
-        =>
-        // hit.normal.map(|x| x + S::one()) / S::from(2).unwrap(),
-        {
-            // Hit a thing!
-            match hit.material.scatter(r, hit.point, hit.normal) {
-                None => Vector3::<S>::zero(),
-                Some((ray, xform)) => xform(color(ray, world, bounces-1)),
+    let p = S::from(7.0 / 8.0).unwrap();
+    let mut bounces = 0;
+    let mut ray = r;
+    let mut color = Vector3::from_value(S::zero());
+    let mut throughput = Vector3::from_value(S::one());
+    loop {
+        match world.intersect(ray) {
+            Some(ref hit) => {
+                // Hit a thing!
+                match hit.material.scatter(ray, hit.point, hit.normal) {
+                    None => return Vector3::zero(),
+                    Some((r, t)) => {
+                        ray = r;
+                        throughput.mul_assign_element_wise(t);
+                        if bounces > 5 {
+                            let p = S::max(throughput.x, S::max(throughput.y, throughput.z));
+                            if random::<S>() > p {
+                                return Vector3::zero();
+                            }
+                            throughput /= p;
+                            bounces += 1;
+                        }
+                    }
+                };
+            }
+
+            _ => {
+                // No hit - eval against background radiation.
+                break;
             }
         }
-
-        _ => {
-            // No hit - eval against background radiation.
-            let t = (r.direction.y + S::one()) / S::from(2).unwrap();
-            Vector3::new(S::one(), S::one(), S::one()) * (S::one() - t)
-                + Vector3::new(S::from(0.5).unwrap(), S::from(0.7).unwrap(), S::one()) * t
-        }
     }
+    let t = (ray.direction.y + S::one()) / S::from(2).unwrap();
+    color = Vector3::from_value(S::one()) * (S::one() - t)
+        + Vector3::new(S::from(0.5).unwrap(), S::from(0.7).unwrap(), S::one()) * t;
+    color.mul_element_wise(throughput)
 }
 
 struct Camera<S> {
