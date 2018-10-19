@@ -1,34 +1,30 @@
-use cgmath::*;
-
 use crate::geom::*;
+use crate::types::*;
 use crate::util;
 
-pub struct Camera<S> {
-    origin: Point3<S>,
-    lower_left: Point3<S>,
-    horizontal: Vector3<S>,
-    vertical: Vector3<S>,
-    lens_radius: S,
-    u: Vector3<S>,
-    v: Vector3<S>,
-    w: Vector3<S>,
+pub struct Camera {
+    origin: Point3f,
+    lower_left: Point3f,
+    horizontal: Vector3f,
+    vertical: Vector3f,
+    lens_radius: Float,
+    u: Vector3f,
+    v: Vector3f,
+    w: Vector3f,
 }
-impl<S> Camera<S>
-where
-    S: BaseFloat,
-{
+impl Camera {
     pub fn new(
-        origin: Point3<S>,
-        target: Point3<S>,
-        vup: Vector3<S>,
-        fov: S,
-        aspect: S,
-        aperture: S,
-        focus_dist: S,
-    ) -> Camera<S> {
-        let theta = fov * S::from(std::f64::consts::PI / 180.0).unwrap();
+        origin: Point3f,
+        target: Point3f,
+        vup: Vector3f,
+        fov: Float,
+        aspect: Float,
+        aperture: Float,
+        focus_dist: Float,
+    ) -> Camera {
+        let theta = fov * PI / 180.0;
 
-        let half_width = (theta / S::from(2).unwrap()).tan();
+        let half_width = (theta / 2.0).tan();
         let half_height = half_width / aspect;
 
         let w = (origin - target).normalize();
@@ -40,22 +36,20 @@ where
             lower_left: origin - (u * half_width + v * half_height + w) * focus_dist,
             horizontal: u * (half_width + half_width) * focus_dist,
             vertical: v * (half_height + half_height) * focus_dist,
-            lens_radius: aperture / S::from(2).unwrap(),
+            lens_radius: aperture / 2.0,
             u,
             v,
             w,
         }
     }
 
-    pub fn get_ray(&self, s: S, t: S) -> Ray3<S> {
+    pub fn get_ray(&self, s: Float, t: Float) -> Ray3f {
         let rd = util::random_in_unit_disk() * self.lens_radius;
         let offset = self.u * rd.x + self.v * rd.y;
 
-        Ray3 {
-            origin: self.origin + offset,
-            direction: ((self.lower_left + self.horizontal * s + self.vertical * t)
-                - (self.origin + offset))
-                .normalize(),
-        }
+        Ray3f::new(
+            self.origin + offset,
+            (self.lower_left + self.horizontal * s + self.vertical * t) - (self.origin + offset),
+        )
     }
 }

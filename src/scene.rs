@@ -1,14 +1,14 @@
-use cgmath::*;
 use crate::aggregate::*;
-use crate::geom::*;
 use crate::material::*;
 use crate::prims::*;
+use crate::shape::*;
+use crate::types::*;
 use crate::util;
 
-pub fn new_cover_scene() -> Aggregate<f64> {
+pub fn new_cover_scene() -> Aggregate {
     let mut random = util::new_random(0);
 
-    let mut prims: Vec<Box<dyn Primitive<f64> + Sync>> = vec![
+    let mut prims: Vec<Box<dyn Primitive + Sync>> = vec![
         Box::new(ShapePrimitive::new(
             Sphere { center: Point3::new(0.0, -1000.0, 0.0), radius: 1000.0 },
             Lambertian { albedo: Vector3::new(0.5, 0.5, 0.5) },
@@ -45,7 +45,7 @@ pub fn new_cover_scene() -> Aggregate<f64> {
                             random() * random(),
                         ),
                     },
-                )) as Box<dyn Primitive<f64> + Sync>
+                )) as Box<dyn Primitive + Sync>
             } else if mat < 0.95 {
                 //metal
                 Box::new(ShapePrimitive::new(
@@ -58,17 +58,17 @@ pub fn new_cover_scene() -> Aggregate<f64> {
                         ),
                         fuzz: 0.5 * random(),
                     },
-                )) as Box<dyn Primitive<f64> + Sync>
+                )) as Box<dyn Primitive + Sync>
             } else {
                 // glass
                 Box::new(ShapePrimitive::new(
                     Sphere { center, radius: 0.2 },
                     Dielectric { ref_index: 1.5 },
-                )) as Box<dyn Primitive<f64> + Sync>
+                )) as Box<dyn Primitive + Sync>
             };
             prims.push(prim)
         }
     }
 
-    Aggregate::<f64> { prims }
+    Aggregate { prims }
 }

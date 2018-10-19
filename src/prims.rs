@@ -1,33 +1,34 @@
-use super::geom::*;
-use super::material::*;
-
-use cgmath::*;
 use std::marker::PhantomData;
 
-pub trait Primitive<S: BaseFloat> {
-    fn intersect(&self, _: Ray3<S>) -> Option<SurfaceInteraction<'_, S>>;
+use crate::geom::*;
+use crate::material::*;
+use crate::shape::*;
+use crate::types::*;
+
+pub trait Primitive {
+    fn intersect(&self, _: Ray3f) -> Option<SurfaceInteraction<'_>>;
 }
 
-pub struct SurfaceInteraction<'a, S: BaseFloat + 'a> {
-    pub prim: &'a dyn Primitive<S>,
-    pub point: Point3<S>,
-    pub normal: Vector3<S>,
-    pub material: &'a dyn Material<S>,
+pub struct SurfaceInteraction<'a> {
+    pub prim: &'a dyn Primitive,
+    pub point: Point3f,
+    pub normal: Vector3f,
+    pub material: &'a dyn Material,
 }
 
-pub struct ShapePrimitive<S: BaseFloat, Sh: Shape<S>, M: Material<S>> {
-    pub shape: Sh,
+pub struct ShapePrimitive<S: Shape, M: Material> {
+    pub shape: S,
     pub material: M,
-    __: PhantomData<fn(_: ()) -> (S)>,
+    __: PhantomData<fn(_: ()) -> (Float)>,
 }
-impl<S: BaseFloat, Sh: Shape<S>, M: Material<S>> ShapePrimitive<S, Sh, M> {
-    pub fn new(shape: Sh, material: M) -> ShapePrimitive<S, Sh, M> {
+impl<S: Shape, M: Material> ShapePrimitive<S, M> {
+    pub fn new(shape: S, material: M) -> ShapePrimitive<S, M> {
         ShapePrimitive { shape, material, __: PhantomData }
     }
 }
 
-impl<S: BaseFloat, Sh: Shape<S>, M: Material<S>> Primitive<S> for ShapePrimitive<S, Sh, M> {
-    fn intersect(&self, r: Ray3<S>) -> Option<SurfaceInteraction<'_, S>> {
+impl<S: Shape, M: Material> Primitive for ShapePrimitive<S, M> {
+    fn intersect(&self, r: Ray3f) -> Option<SurfaceInteraction<'_>> {
         self.shape.intersect(r).map(|(point, normal)| SurfaceInteraction {
             point,
             normal,

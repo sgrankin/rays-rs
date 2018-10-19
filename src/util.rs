@@ -1,6 +1,7 @@
-use cgmath::*;
 use rand::*;
 use std::cell::RefCell;
+
+use crate::types::*;
 
 thread_local!(
     static THREAD_RNG_KEY: RefCell<rngs::SmallRng> = {
@@ -8,8 +9,8 @@ thread_local!(
     }
 );
 
-pub fn random<S: BaseFloat>() -> S {
-    THREAD_RNG_KEY.with(|r| S::from(r.borrow_mut().gen::<f64>()).unwrap())
+pub fn random() -> Float {
+    THREAD_RNG_KEY.with(|r| Float::from(r.borrow_mut().gen::<f64>()))
 }
 
 pub fn new_random(seed: u8) -> Box<FnMut() -> f64> {
@@ -17,21 +18,19 @@ pub fn new_random(seed: u8) -> Box<FnMut() -> f64> {
     Box::new(move || rng.gen())
 }
 
-pub fn random_in_unit_sphere<S: BaseFloat>() -> Vector3<S> {
+pub fn random_in_unit_sphere() -> Vector3f {
     loop {
-        let p = Vector3::new(random(), random(), random()) * S::from(2).unwrap()
-            - Vector3::from_value(S::one());
-        if p.magnitude2() < S::one() {
+        let p = Vector3f::new(random(), random(), random()) * 2.0 - Vector3f::from_value(1.0);
+        if p.magnitude2() < 1.0 {
             return p;
         }
     }
 }
 
-pub fn random_in_unit_disk<S: BaseFloat>() -> Vector2<S> {
+pub fn random_in_unit_disk() -> Vector2f {
     loop {
-        let p = Vector2::new(random(), random()) * S::from(2).unwrap()
-            - Vector2::new(S::one(), S::one());
-        if p.magnitude2() < S::one() {
+        let p = Vector2f::new(random(), random()) * 2.0 - Vector2f::from_value(1.0);
+        if p.magnitude2() < 1.0 {
             return p;
         }
     }

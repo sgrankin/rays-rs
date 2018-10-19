@@ -8,7 +8,6 @@ edition = '2018'
 image = "*"
 rand = "*"
 rayon = "*"
-num-traits = "*"
 simple_logger = "*"
 log = "*"
 
