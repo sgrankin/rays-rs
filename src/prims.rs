@@ -5,7 +5,7 @@ use crate::material::*;
 use crate::shape::*;
 use crate::types::*;
 
-pub trait Primitive {
+pub trait Primitive: Sync + Send {
     fn intersect(&self, _: Ray3f) -> Option<SurfaceInteraction<'_>>;
 }
 

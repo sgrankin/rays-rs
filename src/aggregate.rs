@@ -3,7 +3,7 @@ use crate::prims::*;
 use crate::types::*;
 
 pub struct Aggregate {
-    pub prims: Vec<Box<dyn Primitive + Sync>>,
+    pub prims: Vec<Box<dyn Primitive>>,
 }
 
 impl Primitive for Aggregate {

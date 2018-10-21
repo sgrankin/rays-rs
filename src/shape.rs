@@ -1,7 +1,7 @@
 use crate::geom::*;
 use crate::types::*;
 
-pub trait Shape {
+pub trait Shape: Sync + Send {
     fn intersect(&self, _: Ray3f) -> Option<(Point3f, Vector3f)>;
 }
 

@@ -8,7 +8,7 @@ use crate::util;
 pub fn new_cover_scene() -> Aggregate {
     let mut random = util::new_random(0);
 
-    let mut prims: Vec<Box<dyn Primitive + Sync>> = vec![
+    let mut prims: Vec<Box<dyn Primitive>> = vec![
         Box::new(ShapePrimitive::new(
             Sphere { center: Point3::new(0.0, -1000.0, 0.0), radius: 1000.0 },
             Lambertian { albedo: Vector3::new(0.5, 0.5, 0.5) },
@@ -69,6 +69,5 @@ pub fn new_cover_scene() -> Aggregate {
             prims.push(prim)
         }
     }
-
     Aggregate { prims }
 }

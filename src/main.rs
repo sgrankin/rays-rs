@@ -1,20 +1,45 @@
 use image;
 use log::info;
 use rayon::prelude::*;
+use rays_rs::*;
+use sdl2;
 use simple_logger;
 use std::error::Error;
-
-use rays_rs::*;
+use std::sync::mpsc::sync_channel;
+use std::thread;
+use std::time;
 // struct Scene {
 //     pub aggregate: dyn Primitive,
 // }
 
 fn main() -> Result<(), Box<dyn Error>> {
     simple_logger::init()?;
-    info!("starting");
-    let width = 1920; // 1920; // 960; //960;
-    let height = 1200; // 1200; // 600; // 600;
-    let samples_per_pixel = 3;
+
+    let sdl_context = sdl2::init()?;
+    let video = sdl_context.video()?;
+
+    let width = 640; // 1920; // 960; //960;
+    let height = 400; // 1200; // 600; // 600;
+    let samples_per_pixel = 4;
+
+    let last_display = video.display_bounds(video.num_video_displays()? - 1)?.center();
+
+    let window = video
+        .window("rays-rs", width, height)
+        .position_centered()
+        .position(last_display.x() - (width as i32) / 2, last_display.y() - (height as i32) / 2)
+        // .opengl()
+        .allow_highdpi()
+        .build()?;
+    let mut event_pump = sdl_context.event_pump()?;
+    let mut canvas = window.into_canvas().accelerated().present_vsync().build()?;
+    canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 255));
+    canvas.clear();
+    canvas.present();
+
+    // work around macos bug https://discourse.libsdl.org/t/macos-10-14-mojave-issues/25060/2
+    event_pump.pump_events();
+    canvas.window_mut().set_size(width, height)?;
 
     let world = scene::new_cover_scene();
 
@@ -24,22 +49,61 @@ fn main() -> Result<(), Box<dyn Error>> {
         from,
         to,
         Vector3f::unit_y(),
-        55.0,
-        (width as Float) / (height as Float),
-        0.1,
+        /* fov */ 55.0,
+        /* aspect */ (width as Float) / (height as Float),
+        /* aperture */ 0.1,
         (to - from).magnitude(),
     );
-    let mut buf = framebuf::FrameBuf::new(width, height);
-    trace_into(&mut buf, samples_per_pixel, &world, &c);
-    image::ImageRgb8(buf.mk_image()).save("out.png")?;
-    info!("done");
-    Ok(())
+
+    let (tx, rx) = sync_channel(0);
+    thread::spawn(move || {
+        info!("starting");
+        let mut buf = framebuf::FrameBuf::new(width, height);
+        for i in 0..samples_per_pixel {
+            trace_into(&mut buf, 1, &world, &c);
+            tx.send(buf.mk_image()).unwrap();
+            info!("frame {}/{}", i, samples_per_pixel);
+        }
+        info!("done!");
+    });
+
+    let texture_creator = canvas.texture_creator();
+    let mut texture = texture_creator.create_texture_streaming(
+        sdl2::pixels::PixelFormatEnum::RGB24,
+        width,
+        height,
+    )?;
+
+    'running: loop {
+        for event in event_pump.poll_iter() {
+            match event {
+                sdl2::event::Event::Quit { .. }
+                | sdl2::event::Event::KeyDown {
+                    keycode: Some(sdl2::keyboard::Keycode::Escape),
+                    ..
+                } => break 'running,
+                _ => {}
+            }
+        }
+        if let Ok(buf) = rx.try_recv() {
+            let img = image::ImageRgb8(buf);
+            texture.with_lock(None, |buf, _| {
+                buf.copy_from_slice(&img.raw_pixels());
+            })?;
+            img.save("out.png")?;
+        }
+
+        canvas.copy(&texture, None, None)?;
+        canvas.present();
+        thread::sleep(time::Duration::from_micros(1_000_000 / 60));
+    }
+    return Ok(());
 }
 
 fn trace_into(
     imgbuf: &mut framebuf::FrameBuf,
     samples_per_pixel: u32,
-    scene: &Aggregate,
+    scene: &Primitive,
     camera: &Camera,
 ) {
     let width = imgbuf.width as Float;

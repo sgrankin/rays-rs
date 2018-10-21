@@ -2,7 +2,7 @@ use super::geom::*;
 use super::util::*;
 use crate::types::*;
 
-pub trait Material {
+pub trait Material: Sync + Send {
     fn scatter(&self, in_: Ray3f, point: Point3f, normal: Vector3f) -> Option<(Ray3f, Vector3f)>;
 }
 
