@@ -11,6 +11,7 @@ rand = "*"
 rayon = "*"
 simple_logger = "*"
 sdl2 = "*"
+num = "*"
 
 [dependencies.cgmath]
 version = "*"

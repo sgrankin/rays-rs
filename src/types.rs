@@ -1,4 +1,4 @@
-pub use cgmath::{Array, ElementWise, InnerSpace, MetricSpace, VectorSpace, Zero};
+pub use cgmath::{Array, ElementWise, EuclideanSpace, InnerSpace, MetricSpace, VectorSpace, Zero};
 pub use cgmath::{Point3, Vector2, Vector3};
 
 pub use std::f64::consts::PI;

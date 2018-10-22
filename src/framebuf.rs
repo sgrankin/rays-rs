@@ -2,13 +2,15 @@ use crate::types::*;
 
 #[derive(Copy, Clone)]
 pub struct Pixel {
+    pub x: u32,
+    pub y: u32,
     rgb: Vector3f,
     samples: u32,
 }
 
 impl Pixel {
-    fn new() -> Pixel {
-        Pixel { rgb: Vector3f::zero(), samples: 0 }
+    fn new(x: u32, y: u32) -> Pixel {
+        Pixel { x, y, rgb: Vector3f::zero(), samples: 0 }
     }
     pub fn add_sample(&mut self, rgb: Vector3f) {
         self.rgb += rgb;
@@ -19,12 +21,6 @@ impl Pixel {
         let v = (self.rgb / self.samples as f64).map(|v| (v * 255.99) as u8);
         [v.x, v.y, v.z]
     }
-}
-
-pub struct FrameBuf {
-    pub width: u32,
-    pub height: u32,
-    pixels: Vec<Pixel>,
 }
 
 pub struct EnumPixelsMut<'a> {
@@ -47,9 +43,19 @@ impl<'a> Iterator for EnumPixelsMut<'a> {
     }
 }
 
+pub struct FrameBuf {
+    pub width: u32,
+    pub height: u32,
+    pub pixels: Vec<Pixel>,
+}
+
 impl FrameBuf {
     pub fn new(width: u32, height: u32) -> FrameBuf {
-        FrameBuf { width, height, pixels: vec![Pixel::new(); (width * height) as usize] }
+        FrameBuf {
+            width,
+            height,
+            pixels: (0..height).flat_map(|y| (0..width).map(move |x| Pixel::new(x, y))).collect(),
+        }
     }
     pub fn enum_pixels_mut(&mut self) -> EnumPixelsMut {
         EnumPixelsMut { pixels: self.pixels.iter_mut(), width: self.width, x: 0, y: 0 }

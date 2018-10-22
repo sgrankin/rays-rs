@@ -3,6 +3,7 @@ use crate::types::*;
 
 pub trait Shape: Sync + Send {
     fn intersect(&self, _: Ray3f) -> Option<(Point3f, Vector3f)>;
+    fn bounding_box(&self) -> Option<AABB>;
 }
 
 pub struct Sphere {
@@ -50,5 +51,77 @@ impl Shape for Sphere {
             r.origin + r.direction * (tca + thc)
         };
         Some((p, (p - self.center).normalize() * norm_dir))
+    }
+    fn bounding_box(&self) -> Option<AABB> {
+        let rad = Vector3f::from_value(self.radius);
+        Some(AABB::new(self.center - rad, self.center + rad))
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct AABB {
+    pub min: Point3f,
+    pub max: Point3f,
+}
+
+use std::fmt;
+impl fmt::Debug for AABB {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "vol={:?} min={:?} max={:?}",
+            (self.max[0] - self.min[0]) * (self.max[1] - self.min[1]) * (self.max[2] - self.min[2]),
+            self.min,
+            self.max,
+        )
+    }
+}
+
+impl AABB {
+    pub fn new(min: Point3f, max: Point3f) -> AABB {
+        AABB { min, max }
+    }
+
+    pub fn intersect(&self, r: Ray3f) -> bool {
+        let mut t_min = 0.000_001;
+        let mut t_max = std::f64::MAX;
+
+        for i in 0..3 {
+            let inv_d = 1.0 / r.direction[i];
+            let mut t0 = (self.min[i] - r.origin[i]) * inv_d;
+            let mut t1 = (self.max[i] - r.origin[i]) * inv_d;
+            if inv_d < 0.0 {
+                std::mem::swap(&mut t0, &mut t1);
+            }
+            t_min = iff!(t0 > t_min, t0, t_min);
+            t_max = iff!(t1 < t_max, t1, t_max);
+            if t_max <= t_min {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn union(&self, other: AABB) -> AABB {
+        AABB {
+            min: Point3::new(
+                self.min[0].min(other.min[0]),
+                self.min[1].min(other.min[1]),
+                self.min[2].min(other.min[2]),
+            ),
+            max: Point3::new(
+                self.max[0].max(other.max[0]),
+                self.max[1].max(other.max[1]),
+                self.max[2].max(other.max[2]),
+            ),
+        }
+    }
+
+    pub fn center(&self) -> Point3f {
+        Point3::new(
+            (self.min[0] + self.max[0]) / 2.0,
+            (self.min[1] + self.max[1]) / 2.0,
+            (self.min[2] + self.max[2]) / 2.0,
+        )
     }
 }

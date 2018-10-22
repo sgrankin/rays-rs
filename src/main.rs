@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let width = 640; // 1920; // 960; //960;
     let height = 400; // 1200; // 600; // 600;
-    let samples_per_pixel = 4;
+    let samples_per_pixel = 128;
 
     let last_display = video.display_bounds(video.num_video_displays()? - 1)?.center();
 
@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         (to - from).magnitude(),
     );
 
-    let (tx, rx) = sync_channel(0);
+    let (tx, rx) = sync_channel(100);
     thread::spawn(move || {
         info!("starting");
         let mut buf = framebuf::FrameBuf::new(width, height);
@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             texture.with_lock(None, |buf, _| {
                 buf.copy_from_slice(&img.raw_pixels());
             })?;
-            img.save("out.png")?;
+            // img.save("out.png")?;
         }
 
         canvas.copy(&texture, None, None)?;
@@ -109,13 +109,15 @@ fn trace_into(
     let width = imgbuf.width as Float;
     let height = imgbuf.height as Float;
     imgbuf
-        .enum_pixels_mut()
-        .collect::<Vec<(u32, u32, &mut framebuf::Pixel)>>()
+        .pixels
         .par_iter_mut()
-        .for_each(|(x, y, pixel)| {
+        // .enum_pixels_mut()
+        // .collect::<Vec<(u32, u32, &mut framebuf::Pixel)>>()
+        // .par_iter_mut()
+        .for_each(|pixel| {
             for _ in 0..samples_per_pixel {
-                let u = (*x as Float + random()) / width;
-                let v = (height - *y as Float + random()) / height;
+                let u = (pixel.x as Float + random()) / width;
+                let v = (height - pixel.y as Float + random()) / height;
                 let r = camera.get_ray(u, v);
                 let col = color(r, scene);
                 let col = col.map(|x| x.sqrt()); // gamma correction

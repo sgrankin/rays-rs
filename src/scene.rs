@@ -5,7 +5,7 @@ use crate::shape::*;
 use crate::types::*;
 use crate::util;
 
-pub fn new_cover_scene() -> Aggregate {
+pub fn new_cover_scene<'a>() -> Aggregate {
     let mut random = util::new_random(0);
 
     let mut prims: Vec<Box<dyn Primitive>> = vec![
@@ -69,5 +69,5 @@ pub fn new_cover_scene() -> Aggregate {
             prims.push(prim)
         }
     }
-    Aggregate { prims }
+    Aggregate::new(prims)
 }
