@@ -87,10 +87,9 @@ impl AABB {
         let mut t_max = std::f64::MAX;
 
         for i in 0..3 {
-            let inv_d = 1.0 / r.direction[i];
-            let mut t0 = (self.min[i] - r.origin[i]) * inv_d;
-            let mut t1 = (self.max[i] - r.origin[i]) * inv_d;
-            if inv_d < 0.0 {
+            let mut t0 = (self.min[i] - r.origin[i]) * r.inv_d[i];
+            let mut t1 = (self.max[i] - r.origin[i]) * r.inv_d[i];
+            if r.inv_d[i] < 0.0 {
                 std::mem::swap(&mut t0, &mut t1);
             }
             t_min = iff!(t0 > t_min, t0, t_min);

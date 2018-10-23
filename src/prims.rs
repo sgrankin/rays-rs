@@ -81,21 +81,24 @@ fn point_compare(p: Point3f, q: Point3f) -> Ordering {
 }
 
 pub enum BVH {
-    Leaf { box_: AABB, prim: Box<dyn Primitive> },
+    Leaf { box_: AABB, prim: *const dyn Primitive },
     Node { box_: AABB, left: Box<BVH>, right: Box<BVH> },
 }
 
+unsafe impl Sync for BVH {}
+unsafe impl Send for BVH {}
+
 impl BVH {
-    fn new_sorted(mut prims: Vec<Box<dyn Primitive>>) -> Box<Self> {
+    unsafe fn new_sorted(mut prims: Vec<*const dyn Primitive>) -> Box<Self> {
         if prims.len() == 0 {
             unimplemented!("empty BVH::new input")
         } else if prims.len() == 1 {
             let prim = prims.pop().unwrap();
             Box::new(BVH::Leaf {
-                box_: prim
+                box_: (*prim)
                     .bounding_box()
                     .unwrap_or_else(|| unimplemented!("No bounding box in BVH::new")),
-                prim: prim,
+                prim,
             })
         } else {
             let split = prims.len() / 2;
@@ -108,9 +111,9 @@ impl BVH {
             Box::new(BVH::Node { box_, left: left, right: right })
         }
     }
-    pub fn new(mut prims: Vec<Box<dyn Primitive>>) -> Box<Self> {
+    pub unsafe fn new(prims: &[Box<dyn Primitive>]) -> Box<Self> {
         // ensure all coordinates are positive by offsetting from min
-        let box_ = prims
+        let box_ = (*prims)
             .iter()
             .fold(None, |res, p| match (res, p.bounding_box()) {
                 (None, b) | (b, None) => b,
@@ -118,29 +121,38 @@ impl BVH {
             }).unwrap();
         let min = box_.min;
 
-        prims.sort_unstable_by(|left, right| match (left.bounding_box(), right.bounding_box()) {
-            (None, _) | (_, None) => unimplemented!("No bounding box in BVH::new"),
-            (Some(bleft), Some(bright)) => point_compare(
-                Point3f::from_vec(bleft.center() - min),
-                Point3f::from_vec(bright.center() - min),
-            ),
+        let mut prims: Vec<*const dyn Primitive> =
+            prims.iter().map(|x| &**x as *const dyn Primitive).collect();
+        prims.sort_unstable_by(|left, right| {
+            match ((**left).bounding_box(), (**right).bounding_box()) {
+                (None, _) | (_, None) => unimplemented!("No bounding box in BVH::new"),
+                (Some(bleft), Some(bright)) => point_compare(
+                    Point3f::from_vec(bleft.center() - min),
+                    Point3f::from_vec(bright.center() - min),
+                ),
+            }
         });
         BVH::new_sorted(prims)
     }
 }
 
-impl<'a> Primitive for BVH {
+impl Primitive for BVH {
     fn intersect(&self, r: Ray3f) -> Option<SurfaceInteraction<'_>> {
         match self {
-            BVH::Leaf { box_, prim } if box_.intersect(r) => prim.intersect(r),
-            BVH::Node { box_, left, right } if box_.intersect(r) => {
-                match (left.intersect(r), right.intersect(r)) {
-                    (None, None) => None,
-                    (Some(h), None) | (None, Some(h)) => Some(h),
-                    (Some(hl), Some(hr)) => Some(iff!(hl.t < hr.t, hl, hr)),
+            BVH::Leaf { box_, prim } => {
+                iff!(box_.intersect(r), unsafe { &**prim }.intersect(r), None)
+            }
+            BVH::Node { box_, left, right } => {
+                if box_.intersect(r) {
+                    match (left.intersect(r), right.intersect(r)) {
+                        (None, None) => None,
+                        (Some(h), None) | (None, Some(h)) => Some(h),
+                        (Some(hl), Some(hr)) => Some(iff!(hl.t < hr.t, hl, hr)),
+                    }
+                } else {
+                    None
                 }
             }
-            _ => None,
         }
     }
     fn bounding_box(&self) -> Option<AABB> {

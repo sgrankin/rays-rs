@@ -14,8 +14,7 @@ pub struct Lambertian {
 impl Material for Lambertian {
     fn scatter(&self, _in_: Ray3f, point: Point3f, normal: Vector3f) -> Option<(Ray3f, Vector3f)> {
         // Note we could just as well only scatter with some probability p and have attenuation be albedo/p.
-        let ray =
-            Ray3f { origin: point, direction: (normal + random_in_unit_sphere()).normalize() };
+        let ray = Ray3f::new(point, normal + random_in_unit_sphere());
         Some((ray, self.albedo))
     }
 }
@@ -33,10 +32,7 @@ fn reflect(v: Vector3f, norm: Vector3f) -> Vector3f {
 impl Material for Metal {
     fn scatter(&self, in_: Ray3f, point: Point3f, normal: Vector3f) -> Option<(Ray3f, Vector3f)> {
         let reflected = reflect(in_.direction, normal);
-        let scattered = Ray3f {
-            origin: point,
-            direction: (reflected + random_in_unit_sphere() * self.fuzz).normalize(),
-        };
+        let scattered = Ray3f::new(point, reflected + random_in_unit_sphere() * self.fuzz);
         if scattered.direction.dot(normal) > 0.0 {
             Some((scattered, self.albedo))
         } else {
