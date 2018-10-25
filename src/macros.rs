@@ -30,3 +30,10 @@ macro_rules! max {
         });
     ($x: expr, $($xs: expr), +) => ( max!($x, max!($($xs), +)));
 }
+
+#[macro_export]
+macro_rules! clamp {
+    ($x: expr, $min: expr, $max: expr) => {{
+        max!(min!($x, $max), $min)
+    }};
+}

@@ -2,6 +2,7 @@ use crate::geom::*;
 use crate::types::*;
 
 pub trait Shape: Sync + Send {
+    // TODO: &Ray3f to reduce possible copies
     fn intersect(&self, _: Ray3f) -> Option<(Point3f, Vector3f)>;
     fn bounding_box(&self) -> Option<AABB>;
 }
@@ -78,6 +79,9 @@ impl fmt::Debug for AABB {
 }
 
 impl AABB {
+    pub fn empty() -> AABB {
+        AABB { min: Point3f::from_value(FLOAT_MAX), max: Point3f::from_value(FLOAT_MIN) }
+    }
     pub fn new(min: Point3f, max: Point3f) -> AABB {
         AABB { min, max }
     }
@@ -101,7 +105,7 @@ impl AABB {
         true
     }
 
-    pub fn union(&self, other: AABB) -> AABB {
+    pub fn union(&self, other: &AABB) -> AABB {
         AABB {
             min: Point3::new(
                 self.min[0].min(other.min[0]),
@@ -114,6 +118,40 @@ impl AABB {
                 self.max[2].max(other.max[2]),
             ),
         }
+    }
+
+    pub fn union_p(&self, other: &Point3f) -> AABB {
+        AABB {
+            min: Point3::new(
+                self.min[0].min(other[0]),
+                self.min[1].min(other[1]),
+                self.min[2].min(other[2]),
+            ),
+            max: Point3::new(
+                self.max[0].max(other[0]),
+                self.max[1].max(other[1]),
+                self.max[2].max(other[2]),
+            ),
+        }
+    }
+
+    pub fn offset_p(&self, p: &Point3f) -> Vector3f {
+        let mut res = p - self.min;
+        for i in 0..3 {
+            if self.max[i] > self.min[i] {
+                res[i] /= self.max[i] - self.min[i]
+            };
+        }
+        res
+    }
+
+    pub fn diagonal(&self) -> Vector3f {
+        self.max - self.min
+    }
+
+    pub fn surface_area(&self) -> Float {
+        let d = self.diagonal();
+        2.0 * (d.x * d.y + d.y * d.z + d.x * d.z)
     }
 
     pub fn center(&self) -> Point3f {

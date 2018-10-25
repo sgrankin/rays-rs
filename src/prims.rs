@@ -93,52 +93,157 @@ pub enum BVH {
 unsafe impl Sync for BVH {}
 unsafe impl Send for BVH {}
 
+#[derive(Copy, Clone, Debug)]
+struct PrimitiveInfo {
+    prim: *const dyn Primitive,
+    aabb: AABB,
+    center: Point3f,
+}
+
+#[derive(Clone, Debug)]
+struct SplitResult {
+    cost: Float,
+    left: Vec<PrimitiveInfo>,
+    left_aabb: AABB,
+    right: Vec<PrimitiveInfo>,
+    right_aabb: AABB,
+    bounds: AABB,
+}
+
+#[derive(Copy, Clone, Debug)]
+struct BucketInfo {
+    count: usize,
+    aabb: AABB,
+}
+
 impl BVH {
+    const OBJECT_SPLIT_BUCKETS: usize = 12;
     const MAX_PRIMITIVES_PER_NODE: usize = 1;
-    unsafe fn new_sorted(mut prims: Vec<*const dyn Primitive>) -> Box<Self> {
+
+    unsafe fn new_leaf(aabb: AABB, prims: Vec<PrimitiveInfo>) -> Box<Self> {
+        Box::new(BVH::Leaf { aabb, prims: prims.iter().map(|pi| pi.prim).collect() })
+    }
+
+    fn fold_aabb(aabs: &[AABB]) -> AABB {
+        aabs.iter().fold(AABB::empty(), |r, b| r.union(b))
+    }
+
+    unsafe fn new_sorted(aabb: AABB, prims: Vec<PrimitiveInfo>) -> Box<Self> {
         if prims.len() == 0 {
             unimplemented!("empty BVH::new input")
-        } else if prims.len() <= BVH::MAX_PRIMITIVES_PER_NODE {
-            let aabb = prims
-                .iter()
-                .fold(None, |res, prim| match (res, (**prim).bounding_box()) {
-                    (None, x) | (x, None) => x,
-                    (Some(x), Some(y)) => Some(x.union(y)),
-                }).unwrap_or_else(|| unimplemented!("No bounding box in BVH::new"));
-            Box::new(BVH::Leaf { aabb, prims })
+        } else if prims.len() <= Self::MAX_PRIMITIVES_PER_NODE {
+            return Self::new_leaf(aabb, prims);
         } else {
-            let split = prims.len() / 2;
-            let n = prims.len();
-            let right = prims.split_off(split);
-            let left = BVH::new_sorted(prims);
-            let right = BVH::new_sorted(right);
-            let aabb = left.bounding_box().unwrap().union(right.bounding_box().unwrap());
-            println!("bvh node with n={:?} box={:?}", n, aabb);
+            let mut splits: Vec<SplitResult> =
+                (0..3).map(|dim| Self::object_split(prims.clone(), dim)).flatten().collect();
+            if splits.len() == 0 {
+                return Self::new_leaf(aabb, prims);
+            }
+            let mut best = 0;
+            for i in 1..splits.len() {
+                if splits[i].cost < splits[best].cost {
+                    best = i
+                }
+            }
+
+            let split = splits.swap_remove(best);
+            println!("splitting with {:#?}", split);
+            let left = BVH::new_sorted(split.left_aabb, split.left);
+            let right = BVH::new_sorted(split.right_aabb, split.right);
             Box::new(BVH::Node { aabb, left: left, right: right })
         }
     }
+
+    unsafe fn object_split(mut prims: Vec<PrimitiveInfo>, dim: usize) -> Option<SplitResult> {
+        let bounds = prims.iter().fold(AABB::empty(), |res, pi| res.union(&pi.aabb));
+
+        let center_bounds = prims.iter().fold(AABB::empty(), |res, pi| res.union_p(&pi.center));
+        if center_bounds.min[dim] == center_bounds.max[dim] {
+            return None;
+        }
+        prims.sort_unstable_by(|left, right| {
+            left.center[dim].partial_cmp(&right.center[dim]).unwrap_or(Ordering::Less)
+        });
+
+        let c_buckets = Self::OBJECT_SPLIT_BUCKETS;
+        let pi_bucket = |pi: &PrimitiveInfo| {
+            let i = (center_bounds.offset_p(&pi.center)[dim] * (c_buckets as Float)) as usize;
+            clamp!(i, 0, c_buckets - 1)
+        };
+
+        let mut buckets = vec![BucketInfo { count: 0, aabb: AABB::empty() }; c_buckets];
+        for pi in prims.iter() {
+            let i = pi_bucket(pi);
+            buckets[i].count += 1;
+            buckets[i].aabb = buckets[i].aabb.union(&pi.aabb);
+        }
+
+        // cost for splitting at this bucket
+        let mut cost = vec![0.0 as Float; c_buckets - 1];
+        for i in 0..cost.len() {
+            let aabb_left = buckets[..i + 1].iter().fold(AABB::empty(), |r, b| r.union(&b.aabb));
+            let aabb_right = buckets[i + 1..].iter().fold(AABB::empty(), |r, b| r.union(&b.aabb));
+
+            let count_left = buckets[..i + 1].iter().fold(0, |r, b| r + b.count);
+            let count_right = buckets[i + 1..].iter().fold(0, |r, b| r + b.count);
+
+            cost[i] = 1.0
+                + (count_left as Float * aabb_left.surface_area()
+                    + count_right as Float * aabb_right.surface_area())
+                    / bounds.surface_area()
+        }
+
+        println!("buckets: {:#?}", buckets);
+        let mut min_cost = cost[0];
+        let mut min_cost_bucket = 0;
+        for i in 1..c_buckets - 1 {
+            if cost[i] < min_cost {
+                min_cost = cost[i];
+                min_cost_bucket = i;
+            }
+        }
+        println!("costs: {:#?}", cost);
+        println!("split_bucket: {:?}", min_cost_bucket);
+
+        let (pi_left, pi_right): (Vec<PrimitiveInfo>, Vec<PrimitiveInfo>) =
+            prims.iter().partition(|pi| pi_bucket(pi) <= min_cost_bucket);
+        let left_aabbs: (Vec<AABB>) = pi_left.iter().map(|pi| (pi.aabb)).collect();
+        let left_aabb = Self::fold_aabb(&left_aabbs);
+        let right_aabbs: (Vec<AABB>) = pi_right.iter().map(|pi| pi.aabb).collect();
+        let right_aabb = Self::fold_aabb(&right_aabbs);
+
+        Some(SplitResult {
+            cost: min_cost,
+            bounds,
+            left: pi_left,
+            left_aabb,
+            right: pi_right,
+            right_aabb,
+        })
+    }
+
     pub unsafe fn new(prims: &[Box<dyn Primitive>]) -> Box<Self> {
         // ensure all coordinates are positive by offsetting from min
         let aabb = (*prims)
             .iter()
             .fold(None, |res, p| match (res, p.bounding_box()) {
                 (None, b) | (b, None) => b,
-                (Some(bl), Some(br)) => Some(bl.union(br)),
+                (Some(bl), Some(br)) => Some(bl.union(&br)),
             }).unwrap();
         let min = aabb.min;
 
-        let mut prims: Vec<*const dyn Primitive> =
-            prims.iter().map(|x| &**x as *const dyn Primitive).collect();
-        prims.sort_unstable_by(|left, right| {
-            match ((**left).bounding_box(), (**right).bounding_box()) {
-                (None, _) | (_, None) => unimplemented!("No bounding box in BVH::new"),
-                (Some(bleft), Some(bright)) => point_compare(
-                    Point3f::from_vec(bleft.center() - min),
-                    Point3f::from_vec(bright.center() - min),
-                ),
-            }
-        });
-        BVH::new_sorted(prims)
+        let prims: Vec<PrimitiveInfo> = prims
+            .iter()
+            .map(|x| {
+                let prim = &**x as *const dyn Primitive;
+                let aabb = (*prim)
+                    .bounding_box()
+                    .unwrap_or_else(|| unimplemented!("No bounding box in BVH::new"));
+                let center = aabb.center();
+                PrimitiveInfo { prim, aabb, center }
+            }).collect();
+        let aabb = Self::fold_aabb(&prims.iter().map(|pi| pi.aabb).collect::<Vec<AABB>>());
+        Self::new_sorted(aabb, prims)
     }
 }
 
