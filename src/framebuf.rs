@@ -23,26 +23,6 @@ impl Pixel {
     }
 }
 
-pub struct EnumPixelsMut<'a> {
-    pixels: std::slice::IterMut<'a, Pixel>,
-    width: u32,
-    x: u32,
-    y: u32,
-}
-
-impl<'a> Iterator for EnumPixelsMut<'a> {
-    type Item = (u32, u32, &'a mut Pixel);
-    fn next(&mut self) -> Option<(u32, u32, &'a mut Pixel)> {
-        if self.x >= self.width {
-            self.x = 0;
-            self.y += 1;
-        }
-        let (x, y) = (self.x, self.y);
-        self.x += 1;
-        self.pixels.next().map(move |p| (x, y, p))
-    }
-}
-
 pub struct FrameBuf {
     pub width: u32,
     pub height: u32,
@@ -56,9 +36,6 @@ impl FrameBuf {
             height,
             pixels: (0..height).flat_map(|y| (0..width).map(move |x| Pixel::new(x, y))).collect(),
         }
-    }
-    pub fn enum_pixels_mut(&mut self) -> EnumPixelsMut {
-        EnumPixelsMut { pixels: self.pixels.iter_mut(), width: self.width, x: 0, y: 0 }
     }
 
     pub fn mk_image(&self) -> image::RgbImage {
