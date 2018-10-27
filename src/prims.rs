@@ -1,4 +1,3 @@
-use num;
 use std::cmp::Ordering;
 use std::marker::PhantomData;
 
@@ -51,40 +50,6 @@ impl<S: Shape, M: Material> Primitive for ShapePrimitive<S, M> {
     }
 }
 
-// morton ordering for doubles; see M.Conor, P.Kumar
-fn msdb(a: i16, b: i16) -> u64 {
-    let mut i = 0;
-    let mut n = a ^ b;
-    while n > 0 {
-        i += 1;
-        n >>= 1;
-    }
-    i
-}
-
-fn xor_msb(a: Float, b: Float) -> u64 {
-    let (a_exp, a_mant, _) = num::Float::integer_decode(a);
-    let (b_exp, b_mant, _) = num::Float::integer_decode(b);
-    if a_exp == b_exp {
-        let z = msdb(a_mant, b_mant);
-        return a_exp - z;
-    }
-    iff!(a_exp > b_exp, a_exp, b_exp)
-}
-
-fn point_compare(p: Point3f, q: Point3f) -> Ordering {
-    let mut x = 0;
-    let mut dim = 0;
-    for d in 0..3 {
-        let y = xor_msb(p[d], q[d]);
-        if x < y {
-            x = y;
-            dim = d;
-        }
-    }
-    p[dim].partial_cmp(&q[dim]).unwrap_or_else(|| unimplemented!("NaN in point_compare"))
-}
-
 pub enum BVH {
     Leaf { aabb: AABB, prims: Vec<*const dyn Primitive> },
     Node { aabb: AABB, left: Box<BVH>, right: Box<BVH> },
@@ -117,8 +82,8 @@ struct BucketInfo {
 }
 
 impl BVH {
-    const OBJECT_SPLIT_BUCKETS: usize = 12;
-    const MAX_PRIMITIVES_PER_NODE: usize = 1;
+    const OBJECT_SPLIT_BUCKETS: usize = 16;
+    const MAX_PRIMITIVES_PER_NODE: usize = 4;
 
     unsafe fn new_leaf(aabb: AABB, prims: Vec<PrimitiveInfo>) -> Box<Self> {
         Box::new(BVH::Leaf { aabb, prims: prims.iter().map(|pi| pi.prim).collect() })
@@ -147,7 +112,10 @@ impl BVH {
             }
 
             let split = splits.swap_remove(best);
-            println!("splitting with {:#?}", split);
+            if split.cost >= prims.len() as Float {
+                // BVH cost same as just checking everything, so don't bother with a node.
+                return Self::new_leaf(aabb, prims);
+            }
             let left = BVH::new_sorted(split.left_aabb, split.left);
             let right = BVH::new_sorted(split.right_aabb, split.right);
             Box::new(BVH::Node { aabb, left: left, right: right })
@@ -193,7 +161,6 @@ impl BVH {
                     / bounds.surface_area()
         }
 
-        println!("buckets: {:#?}", buckets);
         let mut min_cost = cost[0];
         let mut min_cost_bucket = 0;
         for i in 1..c_buckets - 1 {
@@ -202,8 +169,6 @@ impl BVH {
                 min_cost_bucket = i;
             }
         }
-        println!("costs: {:#?}", cost);
-        println!("split_bucket: {:?}", min_cost_bucket);
 
         let (pi_left, pi_right): (Vec<PrimitiveInfo>, Vec<PrimitiveInfo>) =
             prims.iter().partition(|pi| pi_bucket(pi) <= min_cost_bucket);
@@ -223,15 +188,6 @@ impl BVH {
     }
 
     pub unsafe fn new(prims: &[Box<dyn Primitive>]) -> Box<Self> {
-        // ensure all coordinates are positive by offsetting from min
-        let aabb = (*prims)
-            .iter()
-            .fold(None, |res, p| match (res, p.bounding_box()) {
-                (None, b) | (b, None) => b,
-                (Some(bl), Some(br)) => Some(bl.union(&br)),
-            }).unwrap();
-        let min = aabb.min;
-
         let prims: Vec<PrimitiveInfo> = prims
             .iter()
             .map(|x| {
