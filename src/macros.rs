@@ -1,4 +1,3 @@
-#[macro_export]
 macro_rules! iff {
     ($x: expr, $y: expr, $z: expr) => {
         if $x {
@@ -9,7 +8,6 @@ macro_rules! iff {
     };
 }
 
-#[macro_export]
 macro_rules! min {
     ($x: expr) => ($x);
     ($x: expr, $y: expr) => ({
@@ -20,7 +18,6 @@ macro_rules! min {
     ($x: expr, $($xs: expr), +) => (min!($x, min!($($xs), +)));
 }
 
-#[macro_export]
 macro_rules! max {
     ($x: expr) => ($x);
     ($x: expr, $y: expr) => ({
@@ -31,7 +28,6 @@ macro_rules! max {
     ($x: expr, $($xs: expr), +) => ( max!($x, max!($($xs), +)));
 }
 
-#[macro_export]
 macro_rules! clamp {
     ($x: expr, $min: expr, $max: expr) => {{
         max!(min!($x, $max), $min)

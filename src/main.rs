@@ -1,13 +1,39 @@
-use image;
+extern crate cgmath;
+extern crate image;
+extern crate log;
+extern crate rand;
+extern crate rayon;
+extern crate sdl2;
+extern crate simple_logger;
+
+pub mod aggregate;
+pub mod camera;
+pub mod framebuf;
+pub mod geom;
+#[macro_use]
+pub mod macros;
+pub mod material;
+pub mod prims;
+pub mod scene;
+pub mod shape;
+pub mod types;
+pub mod util;
+
 use log::info;
 use rayon::prelude::*;
-use rays_rs::*;
-use sdl2;
-use simple_logger;
 use std::error::Error;
 use std::sync::mpsc::sync_channel;
 use std::thread;
 use std::time;
+
+pub use self::aggregate::*;
+pub use self::camera::*;
+pub use self::geom::*;
+pub use self::macros::*;
+pub use self::prims::*;
+pub use self::types::*;
+pub use self::util::*;
+
 // struct Scene {
 //     pub aggregate: dyn Primitive,
 // }
@@ -18,9 +44,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sdl_context = sdl2::init()?;
     let video = sdl_context.video()?;
 
-    let width = 640; // 1920; // 960; //960;
-    let height = 400; // 1200; // 600; // 600;
-    let samples_per_pixel = 128;
+    let width = 960; // 640; // 1920; // 960; //960;
+    let height = 600; // 400; // 1200; // 600; // 600;
+    let samples_per_pixel = 256;
 
     let last_display = video.display_bounds(video.num_video_displays()? - 1)?.center();
 
