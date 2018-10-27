@@ -1,23 +1,26 @@
 extern crate cgmath;
+extern crate hdrsample;
 extern crate image;
 extern crate log;
 extern crate rand;
 extern crate rayon;
 extern crate sdl2;
 extern crate simple_logger;
+extern crate tacho;
 
-pub mod aggregate;
-pub mod camera;
-pub mod framebuf;
-pub mod geom;
+mod aggregate;
+mod camera;
+mod framebuf;
+mod geom;
+mod metrics;
 #[macro_use]
-pub mod macros;
-pub mod material;
-pub mod prims;
-pub mod scene;
-pub mod shape;
-pub mod types;
-pub mod util;
+mod macros;
+mod material;
+mod prims;
+mod scene;
+mod shape;
+mod types;
+mod util;
 
 use log::info;
 use rayon::prelude::*;
@@ -38,8 +41,27 @@ pub use self::util::*;
 //     pub aggregate: dyn Primitive,
 // }
 
+#[derive(Clone)]
+struct Context {
+    reporter: tacho::Reporter,
+
+    time_per_ray: tacho::Timer,
+    time_per_pass: tacho::Timer,
+}
+
+impl Context {
+    fn new() -> Context {
+        let (metrics, reporter) = tacho::new();
+        let time_per_ray = metrics.timer_us("time_per_ray_us");
+        let time_per_pass = metrics.timer_us("time_per_pass_us");
+
+        Context { reporter, time_per_ray, time_per_pass }
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     simple_logger::init()?;
+    let ctx = Context::new();
 
     let sdl_context = sdl2::init()?;
     let video = sdl_context.video()?;
@@ -82,15 +104,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let (tx, rx) = sync_channel(100);
-    thread::spawn(move || {
-        info!("starting");
-        let mut buf = framebuf::FrameBuf::new(width, height);
-        for i in 0..samples_per_pixel {
-            trace_into(&mut buf, 1, &world, &c);
-            tx.send(buf.mk_image()).unwrap();
-            info!("frame {}/{}", i, samples_per_pixel);
+    thread::spawn({
+        let ctx = ctx.clone();
+        move || {
+            info!("starting");
+            let mut buf = framebuf::FrameBuf::new(width, height);
+            for i in 0..samples_per_pixel {
+                trace_into(&ctx, &mut buf, 1, &world, &c);
+                tx.send(buf.mk_image()).unwrap();
+                info!("frame {}/{}", i, samples_per_pixel);
+            }
+            info!("done!");
         }
-        info!("done!");
     });
 
     let texture_creator = canvas.texture_creator();
@@ -117,6 +142,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 buf.copy_from_slice(&img.raw_pixels());
             })?;
             // img.save("out.png")?;
+            info!("metrics:\n{}", metrics::string(&ctx.reporter.peek())?);
         }
 
         canvas.copy(&texture, None, None)?;
@@ -127,29 +153,28 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn trace_into(
+    ctx: &Context,
     imgbuf: &mut framebuf::FrameBuf,
     samples_per_pixel: u32,
     scene: &Primitive,
     camera: &Camera,
 ) {
+    let t_begin = time::Instant::now();
     let width = imgbuf.width as Float;
     let height = imgbuf.height as Float;
-    imgbuf
-        .pixels
-        .par_iter_mut()
-        // .enum_pixels_mut()
-        // .collect::<Vec<(u32, u32, &mut framebuf::Pixel)>>()
-        // .par_iter_mut()
-        .for_each(|pixel| {
-            for _ in 0..samples_per_pixel {
-                let u = (pixel.x as Float + random()) / width;
-                let v = (height - pixel.y as Float + random()) / height;
-                let r = camera.get_ray(u, v);
-                let col = color(r, scene);
-                let col = col.map(|x| x.sqrt()); // gamma correction
-                pixel.add_sample(col)
-            }
-        });
+    imgbuf.pixels.par_iter_mut().for_each(|pixel| {
+        // let t_begin = time::Instant::now();
+        for _ in 0..samples_per_pixel {
+            let u = (pixel.x as Float + random()) / width;
+            let v = (height - pixel.y as Float + random()) / height;
+            let r = camera.get_ray(u, v);
+            let col = color(r, scene);
+            let col = col.map(|x| x.sqrt()); // gamma correction
+            pixel.add_sample(col)
+        }
+        // ctx.time_per_ray.record_since(t_begin);
+    });
+    ctx.time_per_pass.record_since(t_begin);
 }
 
 fn color(r: Ray3f, world: &dyn Primitive) -> Vector3f {
