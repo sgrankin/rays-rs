@@ -69,15 +69,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     let width = 960; // 640; // 1920; // 960; //960;
     let height = 600; // 400; // 1200; // 600; // 600;
     let samples_per_pixel = 256;
+    let aspect_ratio = width as f64 / height as f64;
 
     let last_display = video.display_bounds(video.num_video_displays()? - 1)?.center();
 
+    let mut winwidth = min!(width, 640) as i32;
+    let mut winheight = (winwidth as f64 / aspect_ratio) as i32;
+
     let window = video
-        .window("rays-rs", width, height)
+        .window("rays-rs", winwidth as u32, winheight as u32)
         .position_centered()
-        .position(last_display.x() - (width as i32) / 2, last_display.y() - (height as i32) / 2)
-        // .opengl()
+        .position(last_display.x() - (winwidth) / 2, last_display.y() - (winheight) / 2)
         .allow_highdpi()
+        .resizable()
         .build()?;
     let mut event_pump = sdl_context.event_pump()?;
     let mut canvas = window.into_canvas().accelerated().present_vsync().build()?;
@@ -87,7 +91,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // work around macos bug https://discourse.libsdl.org/t/macos-10-14-mojave-issues/25060/2
     event_pump.pump_events();
-    canvas.window_mut().set_size(width, height)?;
+    canvas.window_mut().set_size(winwidth as u32, winheight as u32)?;
 
     let world = scene::new_cover_scene();
 
@@ -135,6 +139,20 @@ fn main() -> Result<(), Box<dyn Error>> {
                     keycode: Some(sdl2::keyboard::Keycode::Escape),
                     ..
                 } => break 'running,
+                sdl2::event::Event::Window {
+                    win_event:
+                        sdl2::event::WindowEvent::Resized(mut new_winwidth, mut new_winheight),
+                    ..
+                } => {
+                    if new_winwidth != winwidth {
+                        new_winheight = (new_winwidth as f64 / aspect_ratio) as i32
+                    } else {
+                        new_winwidth = (new_winheight as f64 * aspect_ratio) as i32
+                    }
+                    winwidth = new_winwidth;
+                    winheight = new_winheight;
+                    canvas.window_mut().set_size(winwidth as u32, winheight as u32)?;
+                }
                 _ => {}
             }
         }
@@ -143,7 +161,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             texture.with_lock(None, |buf, _| {
                 buf.copy_from_slice(&img.raw_pixels());
             })?;
-            // img.save("out.png")?;
+            img.save("out.png")?;
             info!("metrics:\n{}", metrics::string(&ctx.reporter.peek())?);
         }
 
