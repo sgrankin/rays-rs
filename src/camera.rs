@@ -52,4 +52,25 @@ impl Camera {
             (self.lower_left + self.horizontal * s + self.vertical * t) - (self.origin + offset),
         )
     }
+
+    pub fn get_rays(&self, n: usize, film_pos: Point2f, film_pixel_width: Float) -> Vec<Ray3f> {
+        let mut lens_samples = util::stratified_samples_in_disk(n);
+        util::shuffle(&mut lens_samples);
+        let offsets = util::stratified_samples(n);
+        lens_samples
+            .iter()
+            .zip(offsets)
+            .map(|(lens, film)| {
+                let lens = lens * self.lens_radius;
+                let lens = self.u * lens.x + self.v * lens.y;
+                let origin = self.origin + lens;
+                Ray3f::new(
+                    origin,
+                    (self.lower_left
+                        + self.horizontal * (film_pos.x + film.x * film_pixel_width)
+                        + self.vertical * (film_pos.y))
+                        - origin,
+                )
+            }).collect()
+    }
 }

@@ -109,10 +109,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         move || {
             info!("starting");
             let mut buf = framebuf::FrameBuf::new(width, height);
-            for i in 0..samples_per_pixel {
-                trace_into(&ctx, &mut buf, 1, &world, &c);
+            let mut i = 1;
+            while i < samples_per_pixel {
+                trace_into(&ctx, &mut buf, i, &world, &c);
                 tx.send(buf.mk_image()).unwrap();
                 info!("frame {}/{}", i, samples_per_pixel);
+                i *= 2;
             }
             info!("done!");
         }
@@ -155,32 +157,31 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn trace_into(
     ctx: &Context,
     imgbuf: &mut framebuf::FrameBuf,
-    samples_per_pixel: u32,
+    samples_per_pixel: usize,
     scene: &Primitive,
     camera: &Camera,
 ) {
     let t_begin = time::Instant::now();
     let width = imgbuf.width as Float;
     let height = imgbuf.height as Float;
+    let pixel_size = 1.0 / width;
     imgbuf.pixels.par_iter_mut().for_each(|pixel| {
-        // let t_begin = time::Instant::now();
-        for _ in 0..samples_per_pixel {
-            let u = (pixel.x as Float + random()) / width;
-            let v = (height - pixel.y as Float + random()) / height;
-            let r = camera.get_ray(u, v);
+        let u = (pixel.x as Float) / width;
+        let v = (height - pixel.y as Float) / height;
+        let rays = camera.get_rays(samples_per_pixel, Point2f::new(u, v), pixel_size);
+        for r in rays.iter() {
             let col = color(r, scene);
             let col = col.map(|x| x.sqrt()); // gamma correction
             pixel.add_sample(col)
         }
-        // ctx.time_per_ray.record_since(t_begin);
     });
     ctx.time_per_pass.record_since(t_begin);
 }
 
-fn color(r: Ray3f, world: &dyn Primitive) -> Vector3f {
+fn color(r: &Ray3f, world: &dyn Primitive) -> Vector3f {
     // with credit to https://computergraphics.stackexchange.com/questions/5152/progressive-path-tracing-with-explicit-light-sampling
     let mut bounces = 0;
-    let mut ray = r;
+    let mut ray = *r;
     let mut throughput = Vector3f::from_value(1.0);
     while let Some(ref hit) = world.intersect(ray) {
         match hit.material.scatter(ray, hit.point, hit.normal) {
