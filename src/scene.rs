@@ -26,10 +26,10 @@ pub fn new_cover_scene<'a>() -> Aggregate {
             Metal { albedo: Vector3f::new(0.7, 0.6, 0.5), fuzz: 0.0 },
         )),
     ];
-    for a in -11..11 {
-        for b in -11..11 {
+    for a in -11i16..11i16 {
+        for b in -11i16..11i16 {
             let center =
-                Point3f::new(f64::from(a) + 0.9 * random(), 0.2, f64::from(b) + 0.9 * random());
+                Point3f::new(Float::from(a) + 0.9 * random(), 0.2, Float::from(b) + 0.9 * random());
             if (center - Point3f::new(4.0, 0.0, 2.0)).magnitude() <= 0.9 {
                 continue;
             }

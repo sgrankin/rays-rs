@@ -207,15 +207,15 @@ fn color(r: &Ray3f, world: &dyn Primitive) -> Vector3f {
             Some((r, t)) => {
                 ray = r;
                 throughput.mul_assign_element_wise(t);
-                if bounces > 5 {
+                if bounces > 3 {
                     // russian roulette
-                    let p = max!(throughput.x, throughput.y, throughput.z);
+                    let p = min!(max!(throughput.x, throughput.y, throughput.z), 0.95);
                     if random() > p {
                         return Vector3f::zero(); // absorbed
                     }
                     throughput /= p;
-                    bounces += 1;
                 }
+                bounces += 1;
             }
         }
     }

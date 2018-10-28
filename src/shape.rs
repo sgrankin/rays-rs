@@ -88,7 +88,7 @@ impl AABB {
 
     pub fn intersect(&self, r: Ray3f) -> bool {
         let mut t_min = 0.000_001;
-        let mut t_max = std::f64::MAX;
+        let mut t_max = FLOAT_MAX;
 
         for i in 0..3 {
             let mut t0 = (self.min[i] - r.origin[i]) * r.inv_d[i];
@@ -155,11 +155,6 @@ impl AABB {
     }
 
     pub fn center(&self) -> Point3f {
-        Point3f::new(
-            // TODO: this should be a vector op
-            (self.min[0] + self.max[0]) / 2.0,
-            (self.min[1] + self.max[1]) / 2.0,
-            (self.min[2] + self.max[2]) / 2.0,
-        )
+        (self.min + self.max.to_vec()) / 2.0
     }
 }

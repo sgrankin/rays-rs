@@ -18,7 +18,7 @@ impl Pixel {
     }
 
     pub fn to_rgb(&self) -> [u8; 3] {
-        let v = (self.rgb / self.samples as f64).map(|v| (v * 255.99) as u8);
+        let v = (self.rgb / self.samples as Float).map(|v| (v * 255.99) as u8);
         [v.x, v.y, v.z]
     }
 }

@@ -10,13 +10,13 @@ thread_local!(
 );
 
 pub fn random() -> Float {
-    THREAD_RNG_KEY.with(|r| Float::from(r.borrow_mut().gen::<f64>()))
+    THREAD_RNG_KEY.with(|r| Float::from(r.borrow_mut().gen::<Float>()))
 }
 pub fn shuffle<T>(s: &mut [T]) {
     THREAD_RNG_KEY.with(|r| r.borrow_mut().shuffle(s))
 }
 
-pub fn new_random(seed: u8) -> Box<FnMut() -> f64> {
+pub fn new_random(seed: u8) -> Box<FnMut() -> Float> {
     let mut rng = rngs::SmallRng::from_seed([seed; 16]);
     Box::new(move || rng.gen())
 }
@@ -40,13 +40,13 @@ pub fn random_in_unit_disk() -> Vector2f {
 }
 
 pub fn stratified_samples(samples: usize) -> Vec<Vector2f> {
-    let interval = 1.0 / samples as f64;
+    let interval = 1.0 / samples as Float;
     let mut ys = Vec::with_capacity(samples);
     for i in 0..samples {
-        ys.push((random() + i as f64) * interval);
+        ys.push((random() + i as Float) * interval);
     }
     shuffle(&mut ys);
-    ys.iter().enumerate().map(|(i, y)| Vector2f::new(i as f64 * interval, *y)).collect()
+    ys.iter().enumerate().map(|(i, y)| Vector2f::new(i as Float * interval, *y)).collect()
 }
 
 pub fn stratified_samples_in_disk(samples: usize) -> Vec<Vector2f> {
@@ -55,6 +55,6 @@ pub fn stratified_samples_in_disk(samples: usize) -> Vec<Vector2f> {
         .map(|v| {
             let phi = v.x * PI * 2.0;
             let r = v.y.sqrt();
-            Vector2f::new(r * f64::cos(phi), r * f64::sin(phi))
+            Vector2f::new(r * Float::cos(phi), r * Float::sin(phi))
         }).collect()
 }
