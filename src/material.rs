@@ -6,7 +6,7 @@ pub trait Material: Sync + Send {
     fn scatter(&self, in_: Ray3f, point: Point3f, normal: Vector3f) -> Option<(Ray3f, Vector3f)>;
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone)]
 pub struct Lambertian {
     pub albedo: Vector3f,
 }
@@ -19,7 +19,7 @@ impl Material for Lambertian {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Metal {
     pub albedo: Vector3f,
     pub fuzz: Float,

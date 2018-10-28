@@ -107,12 +107,12 @@ impl AABB {
 
     pub fn union(&self, other: &AABB) -> AABB {
         AABB {
-            min: Point3::new(
+            min: Point3f::new(
                 self.min[0].min(other.min[0]),
                 self.min[1].min(other.min[1]),
                 self.min[2].min(other.min[2]),
             ),
-            max: Point3::new(
+            max: Point3f::new(
                 self.max[0].max(other.max[0]),
                 self.max[1].max(other.max[1]),
                 self.max[2].max(other.max[2]),
@@ -122,12 +122,12 @@ impl AABB {
 
     pub fn union_p(&self, other: &Point3f) -> AABB {
         AABB {
-            min: Point3::new(
+            min: Point3f::new(
                 self.min[0].min(other[0]),
                 self.min[1].min(other[1]),
                 self.min[2].min(other[2]),
             ),
-            max: Point3::new(
+            max: Point3f::new(
                 self.max[0].max(other[0]),
                 self.max[1].max(other[1]),
                 self.max[2].max(other[2]),
@@ -155,7 +155,8 @@ impl AABB {
     }
 
     pub fn center(&self) -> Point3f {
-        Point3::new(
+        Point3f::new(
+            // TODO: this should be a vector op
             (self.min[0] + self.max[0]) / 2.0,
             (self.min[1] + self.max[1]) / 2.0,
             (self.min[2] + self.max[2]) / 2.0,

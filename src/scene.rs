@@ -10,27 +10,27 @@ pub fn new_cover_scene<'a>() -> Aggregate {
 
     let mut prims: Vec<Box<dyn Primitive>> = vec![
         Box::new(ShapePrimitive::new(
-            Sphere { center: Point3::new(0.0, -1000.0, 0.0), radius: 1000.0 },
-            Lambertian { albedo: Vector3::new(0.5, 0.5, 0.5) },
+            Sphere { center: Point3f::new(0.0, -1000.0, 0.0), radius: 1000.0 },
+            Lambertian { albedo: Vector3f::new(0.5, 0.5, 0.5) },
         )),
         Box::new(ShapePrimitive::new(
-            Sphere { center: Point3::new(0.0, 1.0, 0.0), radius: 1.0 },
+            Sphere { center: Point3f::new(0.0, 1.0, 0.0), radius: 1.0 },
             Dielectric { ref_index: 1.5 },
         )),
         Box::new(ShapePrimitive::new(
-            Sphere { center: Point3::new(-4.0, 1.0, 0.0), radius: 1.0 },
-            Lambertian { albedo: Vector3::new(0.4, 0.2, 0.1) },
+            Sphere { center: Point3f::new(-4.0, 1.0, 0.0), radius: 1.0 },
+            Lambertian { albedo: Vector3f::new(0.4, 0.2, 0.1) },
         )),
         Box::new(ShapePrimitive::new(
-            Sphere { center: Point3::new(4.0, 1.0, 0.0), radius: 1.0 },
-            Metal { albedo: Vector3::new(0.7, 0.6, 0.5), fuzz: 0.0 },
+            Sphere { center: Point3f::new(4.0, 1.0, 0.0), radius: 1.0 },
+            Metal { albedo: Vector3f::new(0.7, 0.6, 0.5), fuzz: 0.0 },
         )),
     ];
     for a in -11..11 {
         for b in -11..11 {
             let center =
-                Point3::new(f64::from(a) + 0.9 * random(), 0.2, f64::from(b) + 0.9 * random());
-            if (center - Point3::new(4.0, 0.0, 2.0)).magnitude() <= 0.9 {
+                Point3f::new(f64::from(a) + 0.9 * random(), 0.2, f64::from(b) + 0.9 * random());
+            if (center - Point3f::new(4.0, 0.0, 2.0)).magnitude() <= 0.9 {
                 continue;
             }
             let mat = random();
@@ -39,7 +39,7 @@ pub fn new_cover_scene<'a>() -> Aggregate {
                 Box::new(ShapePrimitive::new(
                     Sphere { center, radius: 0.2 },
                     Lambertian {
-                        albedo: Vector3::new(
+                        albedo: Vector3f::new(
                             random() * random(),
                             random() * random(),
                             random() * random(),
@@ -51,7 +51,7 @@ pub fn new_cover_scene<'a>() -> Aggregate {
                 Box::new(ShapePrimitive::new(
                     Sphere { center, radius: 0.2 },
                     Metal {
-                        albedo: Vector3::new(
+                        albedo: Vector3f::new(
                             (random() + 1.0) / 2.0,
                             (random() + 1.0) / 2.0,
                             (random() + 1.0) / 2.0,

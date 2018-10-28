@@ -91,8 +91,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let world = scene::new_cover_scene();
 
-    let from = Point3::new(12.0, 3.0, 3.0);
-    let to = Point3::new(0.0, 0.0, -1.0);
+    let from = Point3f::new(12.0, 3.0, 3.0);
+    let to = Point3f::new(0.0, 0.0, -1.0);
     let c = Camera::new(
         from,
         to,

@@ -11,7 +11,6 @@ rayon = "*"
 simple_logger = "*"
 sdl2 = "*"
 num = "*"
-simdeez = "*"
 tacho = "*"
 hdrsample = "*"
 

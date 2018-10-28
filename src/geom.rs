@@ -1,34 +1,19 @@
 use crate::types::*;
 
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Ray<S, P, V>
-where
-    S: cgmath::BaseNum,
-    V: cgmath::VectorSpace<Scalar = S> + cgmath::Array,
-    P: cgmath::EuclideanSpace<Scalar = S, Diff = V>,
-{
-    pub origin: P,
-    pub direction: V,
-    pub inv_d: V,
+#[derive(Copy, Clone, Debug)]
+pub struct Ray3f {
+    pub origin: Point3f,
+    pub direction: Vector3f,
+    pub inv_d: Vector3f,
 }
 
-impl<S, P, V> Ray<S, P, V>
-where
-    S: cgmath::BaseFloat,
-    V: cgmath::VectorSpace<Scalar = S>
-        + cgmath::InnerSpace<Scalar = S>
-        + cgmath::Array<Element = S>
-        + cgmath::ElementWise,
-    P: cgmath::EuclideanSpace<Scalar = S, Diff = V>,
-{
-    pub fn new(origin: P, direction: V) -> Self {
+impl Ray3f where {
+    pub fn new(origin: Point3f, direction: Vector3f) -> Self {
         let direction = direction.normalize();
-        Ray {
+        Self {
             origin,
             direction: direction,
-            inv_d: V::from_value(S::one()).div_element_wise(direction),
+            inv_d: Vector3f::from_value(1.0).div_element_wise(direction),
         }
     }
 }
-
-pub type Ray3f = Ray<Float, Point3f, Vector3f>;
