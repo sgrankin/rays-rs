@@ -10,3 +10,5 @@ pub type Vector2f = _Vector2<Float>;
 pub type Vector3f = _Vector3<Float>;
 pub type Point3f = _Point3<Float>;
 pub type Point2f = _Point2<Float>;
+pub type Point2i = _Point2<isize>;
+pub type Point2u = _Point2<usize>;

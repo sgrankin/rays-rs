@@ -39,22 +39,22 @@ pub fn random_in_unit_disk() -> Vector2f {
     }
 }
 
-pub fn stratified_samples(samples: usize) -> Vec<Vector2f> {
+pub fn stratified_samples(samples: usize) -> Vec<Point2f> {
     let interval = 1.0 / samples as Float;
     let mut ys = Vec::with_capacity(samples);
     for i in 0..samples {
         ys.push((random() + i as Float) * interval);
     }
     shuffle(&mut ys);
-    ys.iter().enumerate().map(|(i, y)| Vector2f::new(i as Float * interval, *y)).collect()
+    ys.iter().enumerate().map(|(i, y)| Point2f::new(i as Float * interval, *y)).collect()
 }
 
-pub fn stratified_samples_in_disk(samples: usize) -> Vec<Vector2f> {
+pub fn stratified_samples_in_disk(samples: usize) -> Vec<Point2f> {
     stratified_samples(samples)
         .iter()
         .map(|v| {
             let phi = v.x * PI * 2.0;
             let r = v.y.sqrt();
-            Vector2f::new(r * Float::cos(phi), r * Float::sin(phi))
+            Point2f::new(r * Float::cos(phi), r * Float::sin(phi))
         }).collect()
 }

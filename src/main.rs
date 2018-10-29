@@ -66,8 +66,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sdl_context = sdl2::init()?;
     let video = sdl_context.video()?;
 
-    let width = 960; // 640; // 1920; // 960; //960;
-    let height = 600; // 400; // 1200; // 600; // 600;
+    let width = 640; // 960; // 640; // 1920; // 960; //960;
+    let height = 400; // 600; // 400; // 1200; // 600; // 600;
     let samples_per_pixel = 256;
     let aspect_ratio = width as f64 / height as f64;
 
@@ -102,9 +102,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         to,
         Vector3f::unit_y(),
         /* fov */ 55.0,
-        /* aspect */ (width as Float) / (height as Float),
         /* aperture */ 0.1,
-        (to - from).magnitude(),
+        /*focus_dist */ (to - from).magnitude(),
+        /* film_size */ Point2u::new(width, height),
     );
 
     let (tx, rx) = sync_channel(100);
@@ -115,9 +115,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut buf = framebuf::FrameBuf::new(width, height);
             let mut i = 1;
             while i < samples_per_pixel {
+                info!("tracing {} samples per pixel", i);
                 trace_into(&ctx, &mut buf, i, &world, &c);
                 tx.send(buf.mk_image()).unwrap();
-                info!("frame {}/{}", i, samples_per_pixel);
                 i *= 2;
             }
             info!("done!");
@@ -127,8 +127,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let texture_creator = canvas.texture_creator();
     let mut texture = texture_creator.create_texture_streaming(
         sdl2::pixels::PixelFormatEnum::RGB24,
-        width,
-        height,
+        width as u32,
+        height as u32,
     )?;
 
     'running: loop {
@@ -180,19 +180,25 @@ fn trace_into(
     camera: &Camera,
 ) {
     let t_begin = time::Instant::now();
-    let width = imgbuf.width as Float;
-    let height = imgbuf.height as Float;
-    let pixel_size = 1.0 / width;
-    imgbuf.pixels.par_iter_mut().for_each(|pixel| {
-        let u = (pixel.x as Float) / width;
-        let v = (height - pixel.y as Float) / height;
-        let rays = camera.get_rays(samples_per_pixel, Point2f::new(u, v), pixel_size);
-        for r in rays.iter() {
-            let col = color(r, scene);
-            let col = col.map(|x| x.sqrt()); // gamma correction
-            pixel.add_sample(col)
-        }
-    });
+    let results: Vec<_> = imgbuf
+        .enum_pixels()
+        .par_iter()
+        .flat_map(|pixel| {
+            let rays = camera.get_rays(samples_per_pixel, *pixel);
+            let res: Vec<_> = rays
+                .iter()
+                .map(|(r, offset)| {
+                    let col = color(r, scene);
+                    let col = col.map(|x| x.sqrt()); // gamma correction
+                    (*pixel, *offset, col)
+                }).collect();
+            res
+        }).collect();
+
+    for (pixel, offset, col) in results {
+        imgbuf.add_sample(pixel, offset, col);
+    }
+
     ctx.time_per_pass.record_since(t_begin);
 }
 
