@@ -197,7 +197,8 @@ impl BVH {
                     .unwrap_or_else(|| unimplemented!("No bounding box in BVH::new"));
                 let center = aabb.center();
                 PrimitiveInfo { prim, aabb, center }
-            }).collect();
+            })
+            .collect();
         let aabb = Self::fold_aabb(&prims.iter().map(|pi| pi.aabb).collect::<Vec<AABB>>());
         Self::new_sorted(aabb, prims)
     }

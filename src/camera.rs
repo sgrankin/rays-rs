@@ -78,6 +78,7 @@ impl Camera {
                     ),
                     pixel_offset,
                 )
-            }).collect()
+            })
+            .collect()
     }
 }

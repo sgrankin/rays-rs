@@ -12,10 +12,10 @@ mod aggregate;
 mod camera;
 mod framebuf;
 mod geom;
-mod metrics;
 #[macro_use]
 mod macros;
 mod material;
+mod metrics;
 mod prims;
 mod scene;
 mod shape;
@@ -191,9 +191,11 @@ fn trace_into(
                     let col = color(r, scene);
                     let col = col.map(|x| x.sqrt()); // gamma correction
                     (*pixel, *offset, col)
-                }).collect();
+                })
+                .collect();
             res
-        }).collect();
+        })
+        .collect();
 
     for (pixel, offset, col) in results {
         imgbuf.add_sample(pixel, offset, col);

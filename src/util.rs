@@ -56,5 +56,6 @@ pub fn stratified_samples_in_disk(samples: usize) -> Vec<Point2f> {
             let phi = v.x * PI * 2.0;
             let r = v.y.sqrt();
             Point2f::new(r * Float::cos(phi), r * Float::sin(phi))
-        }).collect()
+        })
+        .collect()
 }
