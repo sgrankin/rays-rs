@@ -20,13 +20,8 @@ pub struct Camera {
 }
 impl Camera {
     pub fn new(
-        origin: Point3f,
-        target: Point3f,
-        up: Vector3f,
-        fov: Float,
-        aperture: Float,
-        focus_dist: Float,
-        film_size: Point2u,
+        origin: Point3f, target: Point3f, up: Vector3f, fov: Float, aperture: Float,
+        focus_dist: Float, film_size: Point2u,
     ) -> Camera {
         let theta = fov * PI / 180.0;
 

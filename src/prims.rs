@@ -118,7 +118,7 @@ impl BVH {
             }
             let left = BVH::new_sorted(split.left_aabb, split.left);
             let right = BVH::new_sorted(split.right_aabb, split.right);
-            Box::new(BVH::Node { aabb, left: left, right: right })
+            Box::new(BVH::Node { aabb, left, right })
         }
     }
 

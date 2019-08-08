@@ -7,13 +7,15 @@ edition = "2018"
 [dependencies]
 image = "*"
 log = "*"
-rand = "*"
+rand = {version="*", features=["small_rng"]}
 rayon = "*"
 simple_logger = "*"
 sdl2 = "*"
 num = "*"
 tacho = "*"
-hdrsample = "*"
+hdrsample = "~3"
+oidn = {path="lib/oidn"}
+failure = "*"
 
 [dependencies.cgmath]
 version = "*"
@@ -21,3 +23,5 @@ features = ["swizzle"]
 
 [profile.release]
 debug = true
+
+[workspace]

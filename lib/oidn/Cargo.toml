@@ -1,0 +1,10 @@
+[package]
+name = "oidn"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+
+[dependencies]
+oidn-sys = {path="../oidn-sys"}
+failure = "*"

@@ -22,6 +22,7 @@ mod shape;
 mod types;
 mod util;
 
+use failure::*;
 use log::info;
 use rayon::prelude::*;
 use std::error::Error;
@@ -66,8 +67,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sdl_context = sdl2::init()?;
     let video = sdl_context.video()?;
 
-    let width = 640; // 960; // 640; // 1920; // 960; //960;
-    let height = 400; // 600; // 400; // 1200; // 600; // 600;
+    let width = 1920;
+    640; // 960; // 640; // 1920; // 960; //960;
+    let height = 1200;
+    400; // 600; // 400; // 1200; // 600; // 600;
     let samples_per_pixel = 256;
     let aspect_ratio = width as f64 / height as f64;
 
@@ -112,12 +115,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         let ctx = ctx.clone();
         move || {
             info!("starting");
+            let mut filter_dev = oidn::Device::new();
             let mut buf = framebuf::FrameBuf::new(width, height);
             let mut i = 1;
             while i < samples_per_pixel {
                 info!("tracing {} samples per pixel", i);
                 trace_into(&ctx, &mut buf, i, &world, &c);
-                tx.send(buf.mk_image()).unwrap();
+                info!("filtering");
+                let rgb = buf.to_rgb();
+                let mut filtered_rgb = vec![0.0f32; rgb.len()];
+                oidn::filter_rt(
+                    &mut filter_dev,
+                    (buf.width, buf.height),
+                    &rgb,
+                    filtered_rgb.as_mut(),
+                )
+                .unwrap();
+
+                info!("sending to display");
+                tx.send(rgb_to_image(&filtered_rgb, width, height)).unwrap();
+                // tx.send(buf.mk_image()).unwrap();
                 i *= 2;
             }
             info!("done!");
@@ -172,12 +189,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     return Ok(());
 }
 
+// TODO: this should write into a pre-allocated image for efficiency
+fn rgb_to_image(rgb: &[f32], width: usize, height: usize) -> image::RgbImage {
+    assert!(rgb.len() == width * height * 3, "rgb.len={}, want {}", rgb.len(), width * height);
+    let mut buf = image::RgbImage::new(width as u32, height as u32);
+    buf.enumerate_pixels_mut().for_each(|(x, y, p)| {
+        let i = (x as usize + width * (height - 1 - y as usize)) * 3;
+        *p = image::Rgb([
+            (rgb[i + 0] * 255.0) as u8,
+            (rgb[i + 1] * 255.0) as u8,
+            (rgb[i + 2] * 255.0) as u8,
+        ]);
+    });
+    buf
+}
+
 fn trace_into(
-    ctx: &Context,
-    imgbuf: &mut framebuf::FrameBuf,
-    samples_per_pixel: usize,
-    scene: &Primitive,
-    camera: &Camera,
+    ctx: &Context, imgbuf: &mut framebuf::FrameBuf, samples_per_pixel: usize,
+    scene: &dyn Primitive, camera: &Camera,
 ) {
     let t_begin = time::Instant::now();
     let results: Vec<_> = imgbuf

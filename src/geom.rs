@@ -10,10 +10,6 @@ pub struct Ray3f {
 impl Ray3f where {
     pub fn new(origin: Point3f, direction: Vector3f) -> Self {
         let direction = direction.normalize();
-        Self {
-            origin,
-            direction: direction,
-            inv_d: Vector3f::from_value(1.0).div_element_wise(direction),
-        }
+        Self { origin, direction, inv_d: Vector3f::from_value(1.0).div_element_wise(direction) }
     }
 }

@@ -1,4 +1,5 @@
 use rand::*;
+use seq::SliceRandom;
 use std::cell::RefCell;
 
 use crate::types::*;
@@ -12,11 +13,12 @@ thread_local!(
 pub fn random() -> Float {
     THREAD_RNG_KEY.with(|r| Float::from(r.borrow_mut().gen::<Float>()))
 }
+
 pub fn shuffle<T>(s: &mut [T]) {
-    THREAD_RNG_KEY.with(|r| r.borrow_mut().shuffle(s))
+    THREAD_RNG_KEY.with(|r| s.shuffle(&mut *r.borrow_mut()))
 }
 
-pub fn new_random(seed: u8) -> Box<FnMut() -> Float> {
+pub fn new_random(seed: u8) -> Box<dyn FnMut() -> Float> {
     let mut rng = rngs::SmallRng::from_seed([seed; 16]);
     Box::new(move || rng.gen())
 }

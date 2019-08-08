@@ -46,10 +46,7 @@ where
 }
 
 fn write_histogram<N: fmt::Display, W: fmt::Write>(
-    out: &mut W,
-    name: &N,
-    labels: &FmtLabels,
-    h: &Histogram<usize>,
+    out: &mut W, name: &N, labels: &FmtLabels, h: &Histogram<usize>,
 ) -> fmt::Result {
     for quantile in [0.5, 0.9, 0.99, 0.999, 0.9999].iter() {
         write_bucket(out, name, labels, *quantile, h.value_at_percentile(*quantile * 100.0))?;
@@ -58,11 +55,7 @@ fn write_histogram<N: fmt::Display, W: fmt::Write>(
 }
 
 fn write_bucket<N: fmt::Display, W: fmt::Write>(
-    out: &mut W,
-    name: &N,
-    labels: &FmtLabels,
-    quantile: f64,
-    value: u64,
+    out: &mut W, name: &N, labels: &FmtLabels, quantile: f64, value: u64,
 ) -> fmt::Result {
     write_metric(
         out,
@@ -73,10 +66,7 @@ fn write_bucket<N: fmt::Display, W: fmt::Write>(
 }
 
 fn write_metric<W: fmt::Write, N: fmt::Display, V: fmt::Display>(
-    out: &mut W,
-    name: &N,
-    labels: &FmtLabels,
-    v: &V,
+    out: &mut W, name: &N, labels: &FmtLabels, v: &V,
 ) -> fmt::Result {
     writeln!(out, "{}{} {}", name, labels, v)
 }
