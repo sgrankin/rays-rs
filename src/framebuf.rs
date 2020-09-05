@@ -75,7 +75,7 @@ impl FrameBuf {
         buf
     }
 
-    pub fn add_sample(&mut self, pixel: Point2u, subpixel: Point2f, rgb: Vector3f) {
+    pub fn add_sample(&mut self, pixel: Point2u, _subpixel: Point2f, rgb: Vector3f) {
         // box filter: ignore subpixel; weight is 1
         self.pixels[pixel.x + self.width * pixel.y].add_sample(rgb)
     }

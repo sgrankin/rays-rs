@@ -1,25 +1,32 @@
 [package]
-name = "rays-rs"
-version = "0.1.0"
 authors = ["Sergey Grankin <sgrankin@gmail.com>"]
 edition = "2018"
+name = "rays-rs"
+version = "0.1.0"
 
 [dependencies]
-image = "*"
-log = "*"
-rand = {version="*", features=["small_rng"]}
-rayon = "*"
-simple_logger = "*"
-sdl2 = "*"
-num = "*"
-tacho = "*"
-hdrsample = "~3"
-oidn = {path="lib/oidn"}
-failure = "*"
+failure = "0.1.8"
+hdrhistogram = "7.1.0"
+image = "0.23.9"
+log = "0.4.11"
+num = "0.3.0"
+oidn = {path = "lib/oidn"}
+rand = { version = "0.7.3", features = ["small_rng"] }
+rayon = "1.4.0"
+sdl2 = "0.34.3"
+simple_logger = "1.9.0"
+tacho = { version = "0.5.0", package = "sgrankin-tacho" }
 
 [dependencies.cgmath]
-version = "*"
 features = ["swizzle"]
+version = "0.17.0"
+
+[profile.dev]
+debug = 1
+debug-assertions = false
+lto = "off"
+opt-level = "s"
+overflow-checks = false
 
 [profile.release]
 debug = true

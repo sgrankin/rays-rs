@@ -2,7 +2,7 @@
 // [1]: https://github.com/linkerd/tacho/blob/master/src/prometheus.rs
 // [2]: https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md
 
-use hdrsample::Histogram;
+use hdrhistogram::Histogram;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
@@ -46,7 +46,7 @@ where
 }
 
 fn write_histogram<N: fmt::Display, W: fmt::Write>(
-    out: &mut W, name: &N, labels: &FmtLabels, h: &Histogram<usize>,
+    out: &mut W, name: &N, labels: &FmtLabels, h: &Histogram<u64>,
 ) -> fmt::Result {
     for quantile in [0.5, 0.9, 0.99, 0.999, 0.9999].iter() {
         write_bucket(out, name, labels, *quantile, h.value_at_percentile(*quantile * 100.0))?;

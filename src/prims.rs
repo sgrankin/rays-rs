@@ -23,7 +23,7 @@ pub struct ShapePrimitive<S: Shape, M: Material> {
     pub shape: S,
     pub material: M,
     aabb: Option<AABB>,
-    __: PhantomData<fn(_: ()) -> (Float)>,
+    __: PhantomData<fn(_: ()) -> Float>,
 }
 impl<S: Shape, M: Material> ShapePrimitive<S, M> {
     pub fn new(shape: S, material: M) -> ShapePrimitive<S, M> {
@@ -172,9 +172,9 @@ impl BVH {
 
         let (pi_left, pi_right): (Vec<PrimitiveInfo>, Vec<PrimitiveInfo>) =
             prims.iter().partition(|pi| pi_bucket(pi) <= min_cost_bucket);
-        let left_aabbs: (Vec<AABB>) = pi_left.iter().map(|pi| (pi.aabb)).collect();
+        let left_aabbs: Vec<AABB> = pi_left.iter().map(|pi| (pi.aabb)).collect();
         let left_aabb = Self::fold_aabb(&left_aabbs);
-        let right_aabbs: (Vec<AABB>) = pi_right.iter().map(|pi| pi.aabb).collect();
+        let right_aabbs: Vec<AABB> = pi_right.iter().map(|pi| pi.aabb).collect();
         let right_aabb = Self::fold_aabb(&right_aabbs);
 
         Some(SplitResult {

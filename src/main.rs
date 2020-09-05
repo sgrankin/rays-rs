@@ -1,13 +1,3 @@
-extern crate cgmath;
-extern crate hdrsample;
-extern crate image;
-extern crate log;
-extern crate rand;
-extern crate rayon;
-extern crate sdl2;
-extern crate simple_logger;
-extern crate tacho;
-
 mod aggregate;
 mod camera;
 mod framebuf;
@@ -22,7 +12,6 @@ mod shape;
 mod types;
 mod util;
 
-use failure::*;
 use log::info;
 use rayon::prelude::*;
 use std::error::Error;
@@ -173,12 +162,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 _ => {}
             }
         }
-        if let Ok(buf) = rx.try_recv() {
-            let img = image::ImageRgb8(buf);
-            texture.with_lock(None, |buf, _| {
-                buf.copy_from_slice(&img.raw_pixels());
-            })?;
+        if let Ok(img) = rx.try_recv() {
             img.save("out.png")?;
+            texture.with_lock(None, |buf, _| {
+                buf.copy_from_slice(&img.into_raw());
+            })?;
             info!("metrics:\n{}", metrics::string(&ctx.reporter.peek())?);
         }
 
